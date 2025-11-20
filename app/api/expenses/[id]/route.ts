@@ -17,7 +17,10 @@ export async function DELETE(
     // Vérifier que la transaction appartient à un compte de l'utilisateur
     const { data: transaction } = await supabase
       .from('transactions')
-      .select('account:accounts(user_id)')
+      .select(`
+        *,
+        account:user_id (user_id)
+      `)
       .eq('id', id)
       .single()
     
