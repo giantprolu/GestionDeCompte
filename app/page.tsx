@@ -211,7 +211,7 @@ export default function Home() {
         >
           <Card className="border-green-100">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-slate-600">
+              <CardTitle className="text-sm font-medium text-slate-100">
                 Revenus du mois
               </CardTitle>
               <ArrowUpCircle className="w-5 h-5 text-green-500" />
@@ -220,7 +220,7 @@ export default function Home() {
               <div className="text-2xl font-bold text-green-600">
                 +{totalMonthIncome.toFixed(2)} €
               </div>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-slate-300 mt-1">
                 {monthTransactions.filter(t => t.type === 'income').length} transaction(s)
               </p>
             </CardContent>
@@ -234,7 +234,7 @@ export default function Home() {
         >
           <Card className="border-red-100">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-slate-600">
+              <CardTitle className="text-sm font-medium text-slate-100">
                 Dépenses du mois
               </CardTitle>
               <ArrowDownCircle className="w-5 h-5 text-red-500" />
@@ -243,7 +243,7 @@ export default function Home() {
               <div className="text-2xl font-bold text-red-600">
                 -{totalMonthExpenses.toFixed(2)} €
               </div>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-slate-300 mt-1">
                 {monthTransactions.filter(t => t.type === 'expense').length} transaction(s)
               </p>
             </CardContent>
@@ -267,28 +267,44 @@ export default function Home() {
             </CardHeader>
             <CardContent className="pt-6">
               {pieData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={(props) => {
-                        const item = pieData[props.index]
-                        return `${item.icon} ${props.value}€`
-                      }}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {pieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value: number) => `${value.toFixed(2)} €`} />
-                  </PieChart>
-                </ResponsiveContainer>
+                <>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={90}
+                        paddingAngle={5}
+                        dataKey="value"
+                        label={(props) => {
+                          const item = pieData[props.index]
+                          return item.icon
+                        }}
+                      >
+                        {pieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        formatter={(value: number) => value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                        contentStyle={{ backgroundColor: '#ffffffff', border: 'none', borderRadius: '8px' }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="mt-4 space-y-2">
+                    {pieData.map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between text-xs md:text-sm">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
+                          <span className="text-slate-300">{item.icon} {item.name}</span>
+                        </div>
+                        <span className="font-medium text-white">{item.value.toFixed(2)} €</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
               ) : (
                 <p className="text-center text-slate-400 py-12">
                   Aucune dépense ce mois-ci

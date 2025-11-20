@@ -207,8 +207,8 @@ export default function PartagePage() {
               </CardHeader>
             </Card>
 
-            {/* Cards des comptes - même style que Dashboard */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+            {/* Cards des comptes - Bourso et Caisse côte à côte sur mobile, Total seul */}
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -238,7 +238,7 @@ export default function PartagePage() {
                 <Card className="border-green-400/30 bg-gradient-to-br from-slate-800 to-slate-900 shadow-xl hover:shadow-2xl transition-all duration-300">
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-xs md:text-sm font-medium text-slate-300">
-                      Compte Caisse EP
+                      Compte CEP
                     </CardTitle>
                     <Wallet className="w-4 h-4 md:w-5 md:h-5 text-green-400" />
                   </CardHeader>
@@ -255,6 +255,7 @@ export default function PartagePage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: dashIndex * 0.1 + 0.3 }}
+                className="col-span-2 lg:col-span-1"
               >
                 <Card className="border-purple-400/30 bg-gradient-to-br from-slate-800 to-slate-900 shadow-xl hover:shadow-2xl transition-all duration-300">
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -273,8 +274,8 @@ export default function PartagePage() {
               </motion.div>
             </div>
 
-            {/* Cards revenus et dépenses */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+            {/* Cards revenus et dépenses - côte à côte sur mobile */}
+            <div className="grid grid-cols-2 gap-4 md:gap-6">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -316,6 +317,63 @@ export default function PartagePage() {
               </motion.div>
             </div>
 
+            {/* Toutes les transactions */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: dashIndex * 0.1 + 0.6 }}
+            >
+              <Card className="bg-gradient-to-br from-slate-800 to-slate-900 shadow-xl">
+                <CardHeader className="border-b border-slate-700/50">
+                  <CardTitle className="text-sm md:text-base">Toutes les transactions</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  {dashboard.transactions.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8 text-sm">Aucune transaction</p>
+                  ) : (
+                    <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                      {dashboard.transactions.map((transaction) => (
+                        <div
+                          key={transaction.id}
+                          className="flex items-center justify-between py-3 px-3 rounded-lg bg-slate-700/30 border border-slate-600/30 hover:bg-slate-700/50 transition-all"
+                        >
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div 
+                              className="w-10 h-10 rounded-full flex items-center justify-center text-lg shadow-md flex-shrink-0"
+                              style={{ backgroundColor: (transaction.category_icon ? '#3b82f6' : '#6b7280') + '30' }}
+                            >
+                              {transaction.category_icon || '📦'}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-sm text-white truncate">{transaction.description}</p>
+                              <div className="flex flex-wrap items-center gap-1 md:gap-2 text-xs text-slate-400 mt-1">
+                                <span className="truncate">{transaction.category}</span>
+                                <span className="hidden md:inline">•</span>
+                                <span className="truncate">{transaction.account_name}</span>
+                                <span className="hidden sm:inline">•</span>
+                                <span className="whitespace-nowrap">{new Date(transaction.date).toLocaleDateString('fr-FR')}</span>
+                                {transaction.is_recurring && (
+                                  <>
+                                    <span className="hidden sm:inline">•</span>
+                                    <span className="text-blue-400 whitespace-nowrap">↻ Récurrent</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right ml-3 flex-shrink-0">
+                            <p className={`font-bold text-sm md:text-base ${transaction.type === 'income' ? 'text-green-400' : 'text-red-400'}`}>
+                              {transaction.type === 'income' ? '+' : '-'}{Math.abs(transaction.amount).toFixed(2)} €
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+
             {/* Graphiques */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
               {/* Répartition des dépenses par catégorie */}
@@ -323,14 +381,39 @@ export default function PartagePage() {
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: dashIndex * 0.1 + 0.6 }}
+                  transition={{ delay: dashIndex * 0.1 + 0.7 }}
                 >
                   <Card className="bg-gradient-to-br from-slate-800 to-slate-900 shadow-xl">
                     <CardHeader className="border-b border-slate-700/50">
                       <CardTitle className="text-sm md:text-base">Dépenses par catégorie</CardTitle>
                     </CardHeader>
                     <CardContent className="pt-6">
-                      <ResponsiveContainer width="100%" height={250}>
+                      <ResponsiveContainer width="100%" height={200} className="md:hidden">
+                        <PieChart>
+                          <Pie
+                            data={pieData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={40}
+                            outerRadius={70}
+                            paddingAngle={5}
+                            dataKey="value"
+                            label={(props) => {
+                              const data = pieData[props.index]
+                              return data.icon
+                            }}
+                          >
+                            {pieData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            formatter={(value: number) => value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                            contentStyle={{ backgroundColor: '#ffffffff', border: 'none', borderRadius: '8px' }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <ResponsiveContainer width="100%" height={250} className="hidden md:block">
                         <PieChart>
                           <Pie
                             data={pieData}
@@ -351,7 +434,7 @@ export default function PartagePage() {
                           </Pie>
                           <Tooltip
                             formatter={(value: number) => value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
-                            contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px' }}
+                            contentStyle={{ backgroundColor: '#ffffffff', border: 'none', borderRadius: '8px' }}
                           />
                         </PieChart>
                       </ResponsiveContainer>
@@ -375,14 +458,34 @@ export default function PartagePage() {
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: dashIndex * 0.1 + 0.7 }}
+                transition={{ delay: dashIndex * 0.1 + 0.8 }}
               >
                 <Card className="bg-gradient-to-br from-slate-800 to-slate-900 shadow-xl">
                   <CardHeader className="border-b border-slate-700/50">
                     <CardTitle className="text-sm md:text-base">Dépenses (7 derniers jours)</CardTitle>
                   </CardHeader>
                   <CardContent className="pt-6">
-                    <ResponsiveContainer width="100%" height={250}>
+                    <ResponsiveContainer width="100%" height={200} className="md:hidden">
+                      <LineChart data={expensesByDay}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                        <XAxis 
+                          dataKey="date" 
+                          stroke="#9ca3af" 
+                          style={{ fontSize: '10px' }}
+                        />
+                        <YAxis 
+                          stroke="#9ca3af" 
+                          style={{ fontSize: '10px' }}
+                          width={40}
+                        />
+                        <Tooltip
+                          formatter={(value: number) => value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                          contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px' }}
+                        />
+                        <Line type="monotone" dataKey="amount" stroke="#ef4444" strokeWidth={2} dot={{ fill: '#ef4444', r: 3 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                    <ResponsiveContainer width="100%" height={250} className="hidden md:block">
                       <LineChart data={expensesByDay}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                         <XAxis 
@@ -405,63 +508,6 @@ export default function PartagePage() {
                 </Card>
               </motion.div>
             </div>
-
-            {/* Toutes les transactions */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: dashIndex * 0.1 + 0.8 }}
-            >
-              <Card className="bg-gradient-to-br from-slate-800 to-slate-900 shadow-xl">
-                <CardHeader className="border-b border-slate-700/50">
-                  <CardTitle className="text-sm md:text-base">Toutes les transactions</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-6">
-                  {dashboard.transactions.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-8 text-sm">Aucune transaction</p>
-                  ) : (
-                    <div className="space-y-3 max-h-[500px] overflow-y-auto">
-                      {dashboard.transactions.map((transaction) => (
-                        <div
-                          key={transaction.id}
-                          className="flex items-center justify-between p-3 rounded-lg bg-slate-700/30 hover:bg-slate-700/50 transition-colors"
-                        >
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <div className={`p-2 rounded-lg flex-shrink-0 ${transaction.type === 'income' ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
-                              {transaction.type === 'income' ? (
-                                <ArrowUpCircle className="w-4 h-4 text-green-400" />
-                              ) : (
-                                <ArrowDownCircle className="w-4 h-4 text-red-400" />
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-white text-sm truncate">{transaction.description}</p>
-                              <div className="flex flex-wrap items-center gap-1 md:gap-2 text-xs text-slate-400 mt-1">
-                                <span className="truncate">{transaction.category_icon || '📦'} {transaction.category}</span>
-                                <span className="hidden md:inline">•</span>
-                                <span className="truncate">{transaction.account_name}</span>
-                                <span className="hidden sm:inline">•</span>
-                                <span className="whitespace-nowrap">{new Date(transaction.date).toLocaleDateString('fr-FR')}</span>
-                                {transaction.is_recurring && (
-                                  <>
-                                    <span className="hidden md:inline">•</span>
-                                    <span className="text-purple-400 whitespace-nowrap">♻️ Récurrent</span>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          <p className={`font-bold text-sm md:text-base ml-2 whitespace-nowrap ${transaction.type === 'income' ? 'text-green-400' : 'text-red-400'}`}>
-                            {transaction.type === 'income' ? '+' : '-'}
-                            {transaction.amount.toFixed(2)} €
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </motion.div>
           </motion.div>
         )
       })}
