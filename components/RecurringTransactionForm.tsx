@@ -58,6 +58,7 @@ export default function RecurringTransactionForm({ accounts, categories: initial
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<RecurringTransactionFormData>({
     resolver: zodResolver(recurringTransactionSchema),
@@ -126,7 +127,7 @@ export default function RecurringTransactionForm({ accounts, categories: initial
                 type="button"
                 onClick={() => {
                   setTransactionType('expense')
-                  register('type').onChange({ target: { value: 'expense' } })
+                  setValue('type', 'expense')
                 }}
                 className={`px-4 py-3 rounded-xl border-2 transition-all duration-200 font-semibold ${
                   transactionType === 'expense'
@@ -140,7 +141,7 @@ export default function RecurringTransactionForm({ accounts, categories: initial
                 type="button"
                 onClick={() => {
                   setTransactionType('income')
-                  register('type').onChange({ target: { value: 'income' } })
+                  setValue('type', 'income')
                 }}
                 className={`px-4 py-3 rounded-xl border-2 transition-all duration-200 font-semibold ${
                   transactionType === 'income'
@@ -151,7 +152,7 @@ export default function RecurringTransactionForm({ accounts, categories: initial
                 💰 Revenu
               </button>
             </div>
-            <input type="hidden" {...register('type')} value={transactionType} />
+            <input type="hidden" {...register('type')} />
           </div>
 
           {/* Montant */}
@@ -177,7 +178,7 @@ export default function RecurringTransactionForm({ accounts, categories: initial
               value={selectedCategory} 
               onValueChange={(value) => {
                 setSelectedCategory(value)
-                register('categoryId').onChange({ target: { value } })
+                setValue('categoryId', value)
               }}
             >
               <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white hover:bg-slate-700 transition-colors h-12">
@@ -194,7 +195,7 @@ export default function RecurringTransactionForm({ accounts, categories: initial
                 ))}
               </SelectContent>
             </Select>
-            <input type="hidden" {...register('categoryId')} value={selectedCategory} />
+            <input type="hidden" {...register('categoryId')} />
             {errors.categoryId && (
               <p className="text-sm text-red-400">{errors.categoryId.message}</p>
             )}
@@ -207,7 +208,7 @@ export default function RecurringTransactionForm({ accounts, categories: initial
               value={selectedAccount} 
               onValueChange={(value) => {
                 setSelectedAccount(value)
-                register('accountId').onChange({ target: { value } })
+                setValue('accountId', value)
               }}
             >
               <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white hover:bg-slate-700 transition-colors h-12">
@@ -221,7 +222,7 @@ export default function RecurringTransactionForm({ accounts, categories: initial
                 ))}
               </SelectContent>
             </Select>
-            <input type="hidden" {...register('accountId')} value={selectedAccount} />
+            <input type="hidden" {...register('accountId')} />
             {errors.accountId && (
               <p className="text-sm text-red-400">{errors.accountId.message}</p>
             )}
@@ -242,7 +243,7 @@ export default function RecurringTransactionForm({ accounts, categories: initial
                   type="button"
                   onClick={() => {
                     setFrequency(freq.value as any)
-                    register('recurrenceFrequency').onChange({ target: { value: freq.value } })
+                    setValue('recurrenceFrequency', freq.value as any)
                   }}
                   className={`px-3 py-3 rounded-xl border-2 transition-all duration-200 text-sm font-semibold ${
                     frequency === freq.value
@@ -254,7 +255,7 @@ export default function RecurringTransactionForm({ accounts, categories: initial
                 </button>
               ))}
             </div>
-            <input type="hidden" {...register('recurrenceFrequency')} value={frequency} />
+            <input type="hidden" {...register('recurrenceFrequency')} />
           </div>
 
           {/* Jour de prélèvement (pour mensuel/annuel) */}
@@ -284,7 +285,7 @@ export default function RecurringTransactionForm({ accounts, categories: initial
             <Input
               id="startDate"
               type="date"
-              className="bg-slate-700/50 border-slate-600/50 text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 h-12"
+              className="bg-slate-700/50 border-slate-600/50 text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 h-12 text-sm md:text-base"
               {...register('startDate')}
             />
             {errors.startDate && (

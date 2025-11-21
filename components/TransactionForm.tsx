@@ -220,7 +220,7 @@ export default function TransactionForm({ accounts, onSuccess, onCancel }: Trans
             <Input 
               id="date" 
               type="date" 
-              className="bg-slate-700/50 border-slate-600/50 text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 h-11" 
+              className="bg-slate-700/50 border-slate-600/50 text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 h-11 text-sm md:text-base" 
               {...register('date')} 
             />
             {errors.date && (

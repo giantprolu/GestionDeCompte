@@ -203,21 +203,22 @@ export default function Home() {
       </div>
 
       {/* Revenus et Dépenses */}
-      <div className="grid grid-cols-2 md:grid-cols-2 gap-4 md:gap-6">
+      <div className="flex gap-4 md:gap-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
+          className="flex-1 min-w-0"
         >
-          <Card className="border-green-100">
+          <Card className="border-green-100 w-full max-w-full">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-slate-100">
+              <CardTitle className="text-sm font-medium text-slate-100 whitespace-nowrap">
                 Revenus du mois
               </CardTitle>
               <ArrowUpCircle className="w-5 h-5 text-green-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">
+              <div className="text-2xl font-bold text-green-600 whitespace-nowrap overflow-x-auto">
                 +{totalMonthIncome.toFixed(2)} €
               </div>
               <p className="text-xs text-slate-300 mt-1">
@@ -231,16 +232,17 @@ export default function Home() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6 }}
+          className="flex-1 min-w-0"
         >
-          <Card className="border-red-100">
+          <Card className="border-red-100 w-full max-w-full">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-slate-100">
+              <CardTitle className="text-sm font-medium text-slate-100 whitespace-nowrap">
                 Dépenses du mois
               </CardTitle>
               <ArrowDownCircle className="w-5 h-5 text-red-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-red-600">
+              <div className="text-2xl font-bold text-red-600 whitespace-nowrap overflow-x-auto">
                 -{totalMonthExpenses.toFixed(2)} €
               </div>
               <p className="text-xs text-slate-300 mt-1">
