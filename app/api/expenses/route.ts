@@ -144,12 +144,36 @@ export async function POST(request: Request) {
         category:categories(*)
       `)
       .single()
-    
+
     if (error) {
       console.error('Insert error:', error)
       throw error
     }
-    
+
+    // Mettre à jour le solde initial du compte
+    const montant = parseFloat(body.amount)
+    let updateValue = 0
+    if (body.type === 'income') {
+      updateValue = montant
+    } else if (body.type === 'expense') {
+      updateValue = -montant
+    }
+    if (updateValue !== 0) {
+      // Récupérer le solde actuel
+      const { data: compte } = await supabase
+        .from('accounts')
+        .select('initial_balance')
+        .eq('id', body.accountId)
+        .single()
+      if (compte) {
+        const nouveauSolde = (compte.initial_balance || 0) + updateValue
+        await supabase
+          .from('accounts')
+          .update({ initial_balance: nouveauSolde })
+          .eq('id', body.accountId)
+      }
+    }
+
     // Mapper les champs pour correspondre au front-end
     const mappedTransaction = {
       id: transaction.id,
@@ -168,7 +192,7 @@ export async function POST(request: Request) {
       createdAt: transaction.created_at,
       updatedAt: transaction.updated_at,
     }
-    
+
     return NextResponse.json(mappedTransaction)
   } catch (error) {
     console.error('Error:', error)

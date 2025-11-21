@@ -45,6 +45,12 @@ export default function TransactionsPage() {
   const [formType, setFormType] = useState<'ponctuel' | 'recurrent'>('ponctuel')
   const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all')
   const [showUpcoming, setShowUpcoming] = useState(false)
+  const [search, setSearch] = useState('')
+  const [searchDate, setSearchDate] = useState('')
+  const [searchAmount, setSearchAmount] = useState('')
+  const [searchCategory, setSearchCategory] = useState('')
+  const [searchAccount, setSearchAccount] = useState('')
+  const [searchNote, setSearchNote] = useState('')
 
   useEffect(() => {
     fetchData()
@@ -76,7 +82,6 @@ export default function TransactionsPage() {
     if (typeFilter !== 'all' && txn.type !== typeFilter) {
       return false
     }
-    
     // Filtre par date future
     if (!showUpcoming) {
       const txnDate = new Date(txn.date)
@@ -85,7 +90,52 @@ export default function TransactionsPage() {
         return false
       }
     }
-    
+    // Filtre par recherche texte globale
+    if (search.trim() !== '') {
+      const lower = search.trim().toLowerCase()
+      const fields = [
+        txn.category?.name,
+        txn.category?.icon,
+        txn.account?.name,
+        txn.note,
+        txn.amount?.toString(),
+        txn.date
+      ].map(v => (v || '').toString().toLowerCase())
+      if (!fields.some(f => f.includes(lower))) {
+        return false
+      }
+    }
+    // Filtre par date exacte
+    if (searchDate.trim() !== '') {
+      const dateStr = new Date(txn.date).toISOString().split('T')[0]
+      if (!dateStr.includes(searchDate.trim())) {
+        return false
+      }
+    }
+    // Filtre par montant
+    if (searchAmount.trim() !== '') {
+      if (!txn.amount.toString().includes(searchAmount.trim())) {
+        return false
+      }
+    }
+    // Filtre par nom de transaction (catégorie)
+    if (searchCategory.trim() !== '') {
+      if (!txn.category?.name?.toLowerCase().includes(searchCategory.trim().toLowerCase())) {
+        return false
+      }
+    }
+    // Filtre par nom de compte
+    if (searchAccount.trim() !== '') {
+      if (!txn.account?.name?.toLowerCase().includes(searchAccount.trim().toLowerCase())) {
+        return false
+      }
+    }
+    // Filtre par description (note)
+    if (searchNote.trim() !== '') {
+      if (!txn.note?.toLowerCase().includes(searchNote.trim().toLowerCase())) {
+        return false
+      }
+    }
     return true
   })
 
@@ -223,7 +273,41 @@ export default function TransactionsPage() {
         <CardHeader className="border-b border-slate-700/50">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <CardTitle className="text-xl font-bold text-white">Liste des transactions</CardTitle>
-            <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+              <input
+                type="date"
+                value={searchDate}
+                onChange={e => setSearchDate(e.target.value)}
+                className="px-3 py-2 rounded-md border border-slate-600/50 bg-slate-700/50 text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 text-sm md:text-base w-full md:w-36"
+              />
+              <input
+                type="number"
+                value={searchAmount}
+                onChange={e => setSearchAmount(e.target.value)}
+                placeholder="Montant (€)"
+                className="px-3 py-2 rounded-md border border-slate-600/50 bg-slate-700/50 text-white placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 text-sm md:text-base w-full md:w-28"
+              />
+              <input
+                type="text"
+                value={searchCategory}
+                onChange={e => setSearchCategory(e.target.value)}
+                placeholder="Catégorie"
+                className="px-3 py-2 rounded-md border border-slate-600/50 bg-slate-700/50 text-white placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 text-sm md:text-base w-full md:w-32"
+              />
+              <input
+                type="text"
+                value={searchAccount}
+                onChange={e => setSearchAccount(e.target.value)}
+                placeholder="Compte"
+                className="px-3 py-2 rounded-md border border-slate-600/50 bg-slate-700/50 text-white placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 text-sm md:text-base w-full md:w-32"
+              />
+              <input
+                type="text"
+                value={searchNote}
+                onChange={e => setSearchNote(e.target.value)}
+                placeholder="Description"
+                className="px-3 py-2 rounded-md border border-slate-600/50 bg-slate-700/50 text-white placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 text-sm md:text-base w-full md:w-32"
+              />
               <Tabs value={typeFilter} onValueChange={(v) => setTypeFilter(v as typeof typeFilter)}>
                 <TabsList className="bg-slate-700/50 border border-slate-600/50">
                   <TabsTrigger value="all" className="data-[state=active]:bg-slate-600 data-[state=active]:text-white text-slate-300">Tout</TabsTrigger>

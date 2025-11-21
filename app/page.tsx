@@ -44,6 +44,7 @@ export default function Home() {
 
   useEffect(() => {
     fetchData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const fetchData = async () => {
@@ -52,10 +53,8 @@ export default function Home() {
         fetch('/api/accounts'),
         fetch('/api/expenses'),
       ])
-      
       const accountsData = await accountsRes.json()
       const transactionsData = await transactionsRes.json()
-      
       setAccounts(accountsData)
       setTransactions(transactionsData)
     } catch (error) {
@@ -65,10 +64,16 @@ export default function Home() {
     }
   }
 
+  // Fonction utilitaire pour récupérer le solde initial d'un compte
+  const getInitialBalance = (accountId: string) => {
+    const account = accounts.find(acc => acc.id === accountId)
+    return account ? account.initialBalance : 0
+  }
+
   // Calcul des transactions du mois en cours
   const now = new Date()
   const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-  
+
   const monthTransactions = transactions.filter(txn => {
     const txnDate = new Date(txn.date)
     return txnDate >= firstDayOfMonth
@@ -95,12 +100,13 @@ export default function Home() {
       return acc
     }, {})
 
+  // Formatage des données pour le PieChart
   const pieData = Object.values(expensesByCategory)
     .map(item => ({
       name: item.category.name,
-      value: parseFloat(item.amount.toFixed(2)),
+      value: item.amount,
       color: item.category.color,
-      icon: item.category.icon
+      icon: item.category.icon,
     }))
     .sort((a, b) => b.value - a.value)
     .slice(0, 5) // Top 5 catégories
@@ -112,10 +118,10 @@ export default function Home() {
 
   const boursoAccount = accounts.find(acc => acc.type === 'ponctuel' && acc.isOwner !== false)
   const caisseAccount = accounts.find(acc => acc.type === 'obligatoire' && acc.isOwner !== false)
-  
+
   // Calculer le total uniquement des comptes propres (pas les partagés)
   const ownAccounts = accounts.filter(acc => acc.isOwner !== false)
-  const totalBalance = ownAccounts.reduce((sum, acc) => sum + acc.currentBalance, 0)
+  const totalBalance = ownAccounts.reduce((sum, acc) => sum + acc.initialBalance, 0)
 
   if (loading) {
     return <div className="text-center py-12">Chargement...</div>
@@ -135,7 +141,7 @@ export default function Home() {
           </Button>
         </Link>
       </div>
-
+      <div className="text-2xl font-bold text-blue-400">{boursoAccount ? getInitialBalance(boursoAccount.id).toFixed(2) : '0.00'} €</div>
       {/* Cards des comptes */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         <motion.div
@@ -151,14 +157,13 @@ export default function Home() {
               <Wallet className="w-5 h-5 text-blue-400" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl md:text-3xl font-bold text-white">
-                {boursoAccount ? `${boursoAccount.currentBalance.toFixed(2)} €` : '0.00 €'}
-              </div>
+                <div className="text-2xl md:text-3xl font-bold text-white">
+                  {boursoAccount ? `${getInitialBalance(boursoAccount.id).toFixed(2)} €` : '0.00 €'}
+                </div>
               <p className="text-xs text-slate-400 mt-1">Dépenses occasionnelles</p>
             </CardContent>
           </Card>
         </motion.div>
-
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -172,14 +177,13 @@ export default function Home() {
               <Wallet className="w-5 h-5 text-green-400" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl md:text-3xl font-bold text-white">
-                {caisseAccount ? `${caisseAccount.currentBalance.toFixed(2)} €` : '0.00 €'}
-              </div>
+                <div className="text-2xl md:text-3xl font-bold text-white">
+                  {caisseAccount ? `${getInitialBalance(caisseAccount.id).toFixed(2)} €` : '0.00 €'}
+                </div>
               <p className="text-xs text-slate-400 mt-1">Dépenses obligatoires</p>
             </CardContent>
           </Card>
         </motion.div>
-
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -193,9 +197,9 @@ export default function Home() {
               <Wallet className="w-5 h-5 text-purple-400" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl md:text-3xl font-bold text-purple-300">
-                {totalBalance.toFixed(2)} €
-              </div>
+                <div className="text-2xl md:text-3xl font-bold text-purple-300">
+                  {totalBalance.toFixed(2)} €
+                </div>
               <p className="text-xs text-slate-400 mt-1">Tous les comptes</p>
             </CardContent>
           </Card>

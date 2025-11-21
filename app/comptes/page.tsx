@@ -13,11 +13,17 @@ interface Account {
   name: string
   type: string
   initialBalance: number
-  currentBalance: number
+  currentBalance?: number
   isOwner?: boolean
   permission?: 'view' | 'edit'
   shareId?: string
   ownerUserId?: string
+}
+interface Transaction {
+  id: string;
+  amount: number;
+  type: 'income' | 'expense';
+  accountId: string;
 }
 
 export default function ComptesPage() {
@@ -25,9 +31,11 @@ export default function ComptesPage() {
   const [loading, setLoading] = useState(true)
   const [balances, setBalances] = useState<Record<string, number>>({})
   const [editingId, setEditingId] = useState<string | null>(null)
+    const [transactions, setTransactions] = useState<Transaction[]>([])
 
   useEffect(() => {
     fetchAccounts()
+      fetchTransactions()
   }, [])
 
   const fetchAccounts = async () => {
@@ -48,6 +56,29 @@ export default function ComptesPage() {
       setLoading(false)
     }
   }
+
+    const fetchTransactions = async () => {
+      try {
+        const response = await fetch('/api/transactions')
+        const data = await response.json()
+        setTransactions(data)
+      } catch (error) {
+        console.error('Erreur lors du chargement des transactions:', error)
+      }
+    }
+
+    // Calculer le solde courant pour chaque compte
+    const getCurrentBalance = (accountId: string) => {
+      const account = accounts.find(acc => acc.id === accountId)
+      if (!account) return 0
+      const accountTransactions = transactions.filter(txn => txn.accountId === accountId)
+      let balance = account.initialBalance
+      accountTransactions.forEach(txn => {
+        if (txn.type === 'income') balance += txn.amount
+        else if (txn.type === 'expense') balance -= txn.amount
+      })
+      return balance
+    }
 
   const handleUpdateBalance = async (accountId: string) => {
     try {
@@ -203,17 +234,17 @@ export default function ComptesPage() {
                     // Mode affichage
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <div>
-                          <Label className="text-sm font-medium text-slate-400">Solde actuel</Label>
-                          <div className={`text-3xl md:text-4xl font-bold mt-1 ${
-                            account.currentBalance >= 0 ? 'text-green-400' : 'text-red-400'
-                          }`}>
-                            {account.currentBalance.toFixed(2)} €
+                          <div>
+                            <Label className="text-sm font-medium text-slate-400">Solde actuel</Label>
+                            <div className={`text-3xl md:text-4xl font-bold mt-1 ${
+                              getCurrentBalance(account.id) >= 0 ? 'text-green-400' : 'text-red-400'
+                            }`}>
+                              {getCurrentBalance(account.id).toFixed(2)} €
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">
+                              Initial: {account.initialBalance.toFixed(2)} €
+                            </p>
                           </div>
-                          <p className="text-xs text-slate-500 mt-1">
-                            Initial: {account.initialBalance.toFixed(2)} €
-                          </p>
-                        </div>
                         {(account.isOwner || account.permission === 'edit') && (
                         <Button
                           onClick={() => setEditingId(account.id)}
