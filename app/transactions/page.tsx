@@ -8,6 +8,7 @@ import { motion } from 'framer-motion'
 import TransactionForm from '@/components/TransactionForm'
 import RecurringTransactionForm from '@/components/RecurringTransactionForm'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Calendar, Wallet } from "lucide-react";
 
 interface Account {
   id: string
@@ -78,17 +79,22 @@ export default function TransactionsPage() {
 
   // Filtrer les transactions côté client
   const filteredTransactions = transactions.filter(txn => {
-    // Filtre par type
-    if (typeFilter !== 'all' && txn.type !== typeFilter) {
-      return false
-    }
-    // Filtre par date future
-    if (!showUpcoming) {
-      const txnDate = new Date(txn.date)
-      const now = new Date()
+    const txnDate = new Date(txn.date)
+    const now = new Date()
+    if (showUpcoming) {
+      // Si showUpcoming est activé, on affiche uniquement les transactions futures
+      if (txnDate <= now) {
+        return false
+      }
+    } else {
+      // Sinon, on masque les transactions futures
       if (txnDate > now) {
         return false
       }
+    }
+    // Filtre par type (après le filtrage des dates)
+    if (typeFilter !== 'all' && txn.type !== typeFilter) {
+      return false
     }
     // Filtre par recherche texte globale
     if (search.trim() !== '') {
@@ -271,63 +277,92 @@ export default function TransactionsPage() {
       {/* Filtres */}
       <Card className="border-2 border-slate-700/50 bg-gradient-to-br from-slate-800/95 to-slate-900/95 shadow-xl backdrop-blur-sm">
         <CardHeader className="border-b border-slate-700/50">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <CardTitle className="text-xl font-bold text-white">Liste des transactions</CardTitle>
-            <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-              <input
-                type="date"
-                value={searchDate}
-                onChange={e => setSearchDate(e.target.value)}
-                className="px-3 py-2 rounded-md border border-slate-600/50 bg-slate-700/50 text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 text-sm md:text-base w-full md:w-36"
-              />
-              <input
-                type="number"
-                value={searchAmount}
-                onChange={e => setSearchAmount(e.target.value)}
-                placeholder="Montant (€)"
-                className="px-3 py-2 rounded-md border border-slate-600/50 bg-slate-700/50 text-white placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 text-sm md:text-base w-full md:w-28"
-              />
-              <input
-                type="text"
-                value={searchCategory}
-                onChange={e => setSearchCategory(e.target.value)}
-                placeholder="Catégorie"
-                className="px-3 py-2 rounded-md border border-slate-600/50 bg-slate-700/50 text-white placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 text-sm md:text-base w-full md:w-32"
-              />
-              <input
-                type="text"
-                value={searchAccount}
-                onChange={e => setSearchAccount(e.target.value)}
-                placeholder="Compte"
-                className="px-3 py-2 rounded-md border border-slate-600/50 bg-slate-700/50 text-white placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 text-sm md:text-base w-full md:w-32"
-              />
-              <input
-                type="text"
-                value={searchNote}
-                onChange={e => setSearchNote(e.target.value)}
-                placeholder="Description"
-                className="px-3 py-2 rounded-md border border-slate-600/50 bg-slate-700/50 text-white placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 text-sm md:text-base w-full md:w-32"
-              />
-              <Tabs value={typeFilter} onValueChange={(v) => setTypeFilter(v as typeof typeFilter)}>
-                <TabsList className="bg-slate-700/50 border border-slate-600/50">
-                  <TabsTrigger value="all" className="data-[state=active]:bg-slate-600 data-[state=active]:text-white text-slate-300">Tout</TabsTrigger>
-                  <TabsTrigger value="income" className="data-[state=active]:bg-green-500 data-[state=active]:text-white text-slate-300">Revenus</TabsTrigger>
-                  <TabsTrigger value="expense" className="data-[state=active]:bg-red-500 data-[state=active]:text-white text-slate-300">Dépenses</TabsTrigger>
-                </TabsList>
-              </Tabs>
-              <Button
-                variant={showUpcoming ? "default" : "outline"}
-                size="sm"
-                onClick={() => setShowUpcoming(!showUpcoming)}
-                className={`gap-2 ${
-                  showUpcoming 
-                    ? 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white' 
-                    : 'bg-slate-700/50 border-slate-600/50 text-slate-300 hover:bg-slate-700'
-                }`}
-              >
-                <RefreshCw className="w-4 h-4" />
-                {showUpcoming ? 'Masquer futures' : 'Voir futures'}
-              </Button>
+          <div className="flex flex-col gap-2 w-full">
+            <CardTitle className="text-xl font-bold text-white mb-2">Liste des transactions</CardTitle>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 w-full">
+              <div className="flex items-center gap-1">
+                <Filter className="w-4 h-4 text-blue-400" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Recherche..."
+                  className="px-2 py-1 rounded-md border border-slate-600/50 bg-slate-700/50 text-white placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 text-xs w-full"
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <TrendingUp className="w-4 h-4 text-green-400" />
+                <input
+                  type="number"
+                  value={searchAmount}
+                  onChange={e => setSearchAmount(e.target.value)}
+                  placeholder="Montant (€)"
+                  className="px-2 py-1 rounded-md border border-slate-600/50 bg-slate-700/50 text-white placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 text-xs w-full"
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <Calendar className="w-4 h-4 text-blue-400" />
+                <input
+                  type="date"
+                  value={searchDate}
+                  onChange={e => setSearchDate(e.target.value)}
+                  className="px-2 py-1 rounded-md border border-slate-600/50 bg-slate-700/50 text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 text-xs w-full"
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <Plus className="w-4 h-4 text-purple-400" />
+                <input
+                  type="text"
+                  value={searchCategory}
+                  onChange={e => setSearchCategory(e.target.value)}
+                  placeholder="Catégorie"
+                  className="px-2 py-1 rounded-md border border-slate-600/50 bg-slate-700/50 text-white placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 text-xs w-full"
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <Wallet className="w-4 h-4 text-blue-400" />
+                <input
+                  type="text"
+                  value={searchAccount}
+                  onChange={e => setSearchAccount(e.target.value)}
+                  placeholder="Compte"
+                  className="px-2 py-1 rounded-md border border-slate-600/50 bg-slate-700/50 text-white placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 text-xs w-full"
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <Filter className="w-4 h-4 text-blue-400" />
+                <input
+                  type="text"
+                  value={searchNote}
+                  onChange={e => setSearchNote(e.target.value)}
+                  placeholder="Description"
+                  className="px-2 py-1 rounded-md border border-slate-600/50 bg-slate-700/50 text-white placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 text-xs w-full"
+                />
+              </div>
+              <div className="col-span-2 sm:col-span-3 md:col-span-6 flex gap-2 mt-2">
+                <div className="w-full flex flex-col sm:flex-row gap-2 sm:gap-4 overflow-x-auto pb-1">
+                  <Tabs value={typeFilter} onValueChange={(v) => setTypeFilter(v as typeof typeFilter)}>
+                    <TabsList className="flex bg-slate-700/50 border border-slate-600/50 rounded-lg overflow-x-auto">
+                      <TabsTrigger value="all" className="min-w-[70px] px-2 py-1 text-xs sm:text-sm data-[state=active]:bg-slate-600 data-[state=active]:text-white text-slate-300">Tout</TabsTrigger>
+                      <TabsTrigger value="income" className="min-w-[90px] px-2 py-1 text-xs sm:text-sm data-[state=active]:bg-green-500 data-[state=active]:text-white text-slate-300">Revenus</TabsTrigger>
+                      <TabsTrigger value="expense" className="min-w-[90px] px-2 py-1 text-xs sm:text-sm data-[state=active]:bg-red-500 data-[state=active]:text-white text-slate-300">Dépenses</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                  <Button
+                    variant={showUpcoming ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setShowUpcoming(!showUpcoming)}
+                    className={`flex items-center gap-1 px-2 py-1 text-xs sm:text-sm rounded-lg transition-all duration-200 ${
+                      showUpcoming 
+                        ? 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white' 
+                        : 'bg-slate-700/50 border-slate-600/50 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    <span className="hidden xs:inline">{showUpcoming ? 'Masquer futures' : 'Voir futures'}</span>
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         </CardHeader>
