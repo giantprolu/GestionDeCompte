@@ -215,14 +215,14 @@ export default function ComptesPage() {
                           </p>
                         </div>
                         {(account.isOwner || account.permission === 'edit') && (
-                          <Button
-                            onClick={() => setEditingId(account.id)}
-                            variant="ghost"
-                            size="icon"
-                            className="h-12 w-12 rounded-full bg-slate-700/30 hover:bg-slate-700 border-2 border-slate-600/30 hover:border-blue-500/50 transition-all"
-                          >
-                            <Pencil className="w-5 h-5 text-slate-300" />
-                          </Button>
+                        <Button
+                          onClick={() => setEditingId(account.id)}
+                          variant="ghost"
+                          size="icon"
+                          className="h-12 w-12 rounded-full bg-slate-700/30 hover:bg-slate-700 border-2 border-slate-600/30 hover:border-blue-500/50 transition-all"
+                        >
+                          <Pencil className="w-5 h-5 text-slate-300" />
+                        </Button>
                         )}
                       </div>
                     </div>

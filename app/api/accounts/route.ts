@@ -45,6 +45,7 @@ export async function GET() {
           type: account.type,
           initialBalance: account.initial_balance,
           currentBalance: balance,
+          isOwner: true,
           createdAt: account.created_at,
           updatedAt: account.updated_at,
         }
