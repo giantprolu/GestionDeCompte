@@ -19,11 +19,11 @@ export async function DELETE(
       .from('transactions')
       .select(`
         *,
-        account:user_id (user_id)
+        account:accounts (user_id)
       `)
       .eq('id', id)
       .single()
-    
+
     if (!transaction || transaction.account?.user_id !== userId) {
       return NextResponse.json({ error: 'Transaction non trouvée' }, { status: 404 })
     }
