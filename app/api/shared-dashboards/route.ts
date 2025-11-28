@@ -8,6 +8,7 @@ interface Account {
   name: string
   type: string
   currentBalance: number
+  initialBalance?: number
   icon: string
   color: string
 }
@@ -102,13 +103,10 @@ export async function GET(request: NextRequest) {
         continue
       }
 
-      // Calculer les statistiques (uniquement avec transactions passées)
+      // Calculer le total disponible de la même manière que la page principale:
+      // somme des soldes initiaux (`initial_balance`) des comptes (sans appliquer les transactions)
       const totalBalance = ownerAccounts?.reduce((sum, acc) => {
-        const accTransactions = ownerTransactions?.filter(t => t.account_id === acc.id) || []
-        const balance = acc.initial_balance + accTransactions.reduce((bal, t) => {
-          return bal + (t.type === 'income' ? t.amount : -t.amount)
-        }, 0)
-        return sum + balance
+        return sum + (acc.initial_balance || 0)
       }, 0) || 0
 
       const currentMonth = new Date().getMonth()
@@ -137,10 +135,37 @@ export async function GET(request: NextRequest) {
           name: acc.name,
           type: acc.type,
           currentBalance,
+          initialBalance: acc.initial_balance,
           icon: acc.icon,
           color: acc.color
         }
       }) || []
+
+      // DEBUG: comparer les soldes calculés ici avec ce que renverrait `/api/accounts`.
+      // Ces logs sont temporaires pour investiguer la divergence des soldes.
+      try {
+        const debugBalances = (ownerAccounts || []).map(acc => {
+          const accTxs = ownerTransactions?.filter(t => t.account_id === acc.id) || []
+          const balanceViaAccountsApi = (acc.initial_balance || 0) + accTxs.reduce((bal, t) => {
+            return bal + (t.type === 'income' ? t.amount : -t.amount)
+          }, 0)
+          const sharedCurrent = accounts.find(a => a.id === acc.id)?.currentBalance ?? null
+          return {
+            id: acc.id,
+            name: acc.name,
+            initial_balance: acc.initial_balance || 0,
+            balanceViaAccountsApi,
+            sharedCurrent,
+            diff: balanceViaAccountsApi - (sharedCurrent ?? 0)
+          }
+        })
+
+        const sumViaAccountsApi = debugBalances.reduce((s, d) => s + d.balanceViaAccountsApi, 0)
+        const sumShared = debugBalances.reduce((s, d) => s + (d.sharedCurrent ?? 0), 0)
+
+      } catch (e) {
+        console.error('DEBUG error while computing debug balances', e)
+      }
 
       // Formater les transactions
       const transactions: Transaction[] = ownerTransactions?.map(t => ({

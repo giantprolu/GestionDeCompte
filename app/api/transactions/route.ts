@@ -23,8 +23,8 @@ export async function GET(request: Request) {
       .from('accounts')
       .select('id')
       .eq('user_id', userId)
-    
-    const userAccountIds = userAccounts?.map(acc => acc.id) || []
+
+    const userAccountIds = userAccounts?.map((acc: any) => acc.id) || []
 
     let query = supabase
       .from('transactions')
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
     const { data: transactions, error } = await query
 
     if (error) throw error
-    
+
     // Mapper les champs pour correspondre au front-end
     const mappedTransactions = (transactions || []).map((txn: any) => ({
       id: txn.id,
@@ -71,7 +71,7 @@ export async function GET(request: Request) {
       createdAt: txn.created_at,
       updatedAt: txn.updated_at,
     }))
-    
+
     return NextResponse.json(mappedTransactions)
   } catch (error) {
     console.error('Error:', error)
@@ -87,7 +87,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    
+
     // Vérifier que le compte appartient à l'utilisateur
     const { data: account, error: accountError } = await supabase
       .from('accounts')
@@ -95,21 +95,20 @@ export async function POST(request: Request) {
       .eq('id', body.accountId)
       .eq('user_id', userId)
       .single()
-        
+
     if (!account) {
-      // Lister tous les comptes de l'utilisateur pour déboguer
       const { data: allAccounts } = await supabase
         .from('accounts')
         .select('id, name, user_id')
         .eq('user_id', userId)
-            
-      return NextResponse.json({ 
+
+      return NextResponse.json({
         error: 'Compte non trouvé',
         debug: {
           searchedAccountId: body.accountId,
           userId,
-          availableAccounts: allAccounts
-        }
+          availableAccounts: allAccounts,
+        },
       }, { status: 404 })
     }
 
@@ -148,7 +147,6 @@ export async function POST(request: Request) {
       updateValue = -montant
     }
     if (updateValue !== 0) {
-      // Récupérer le solde actuel
       const { data: compte } = await supabase
         .from('accounts')
         .select('initial_balance')
@@ -163,7 +161,6 @@ export async function POST(request: Request) {
       }
     }
 
-    // Mapper les champs pour correspondre au front-end
     const mappedTransaction = {
       id: transaction.id,
       amount: transaction.amount,

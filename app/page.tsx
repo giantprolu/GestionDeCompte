@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { getBaseInitial, sumBalances } from '@/lib/balances'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { Wallet, TrendingDown, TrendingUp, Calendar, ArrowUpCircle, ArrowDownCircle } from 'lucide-react'
@@ -64,11 +65,14 @@ export default function Home() {
     }
   }
 
-  // Fonction utilitaire pour récupérer le solde initial d'un compte
+  // Fonction utilitaire pour récupérer le solde initial d'un compte (via utilitaire centralisé)
   const getInitialBalance = (accountId: string) => {
     const account = accounts.find(acc => acc.id === accountId)
-    return account ? account.initialBalance : 0
+    return account ? getBaseInitial(account, null) : 0
   }
+
+  // Calculer le solde courant d'un compte en appliquant ses transactions
+  
 
   // Calcul des transactions du mois en cours
   const now = new Date()
@@ -121,7 +125,7 @@ export default function Home() {
 
   // Calculer le total uniquement des comptes propres (pas les partagés)
   const ownAccounts = accounts.filter(acc => acc.isOwner !== false)
-  const totalBalance = ownAccounts.reduce((sum, acc) => sum + acc.initialBalance, 0)
+  const totalBalance = sumBalances(ownAccounts, transactions, null, { useCurrent: false, onlyOwn: true })
 
   if (loading) {
     return <div className="text-center py-12">Chargement...</div>

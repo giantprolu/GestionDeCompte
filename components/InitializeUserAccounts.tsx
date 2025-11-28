@@ -24,7 +24,6 @@ export default function InitializeUserAccounts() {
         const accounts = await response.json()
 
         if (accounts.length === 0) {
-          console.log('Création des comptes par défaut...')
           
           const boursoRes = await fetch('/api/accounts', {
             method: 'POST',
@@ -56,7 +55,21 @@ export default function InitializeUserAccounts() {
             throw new Error(`Erreur Caisse EP: ${errorData.error}`)
           }
 
-          console.log('✅ Comptes créés avec succès!')
+          const carteRes = await fetch('/api/accounts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: 'Carte Restaurant',
+              type: 'ponctuel',
+              initialBalance: 0,
+            }),
+          })
+
+          if (!carteRes.ok) {
+            const errorData = await carteRes.json()
+            throw new Error(`Erreur Carte Restaurant: ${errorData.error}`)
+          }
+
         }
         
         setStatus('done')

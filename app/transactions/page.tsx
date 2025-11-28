@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Plus, Filter, Trash2, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react'
@@ -46,6 +46,7 @@ export default function TransactionsPage() {
   const [formType, setFormType] = useState<'ponctuel' | 'recurrent'>('ponctuel')
   const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all')
   const [showUpcoming, setShowUpcoming] = useState(false)
+  const [showOnlyCurrentMonth, setShowOnlyCurrentMonth] = useState(true)
   const [search, setSearch] = useState('')
   const [searchDate, setSearchDate] = useState('')
   const [searchAmount, setSearchAmount] = useState('')
@@ -55,6 +56,22 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     fetchData()
+  }, [])
+
+  // Vérifie périodiquement si le mois a changé et recharge les données si nécessaire
+  const currentMonthRef = useRef(`${new Date().getMonth()}-${new Date().getFullYear()}`)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const key = `${new Date().getMonth()}-${new Date().getFullYear()}`
+      if (key !== currentMonthRef.current) {
+        currentMonthRef.current = key
+        // Remettre l'affichage sur le mois courant et recharger
+        setShowOnlyCurrentMonth(true)
+        fetchData()
+      }
+    }, 60_000) // vérifie chaque minute
+
+    return () => clearInterval(interval)
   }, [])
 
   const fetchData = async () => {
@@ -81,6 +98,12 @@ export default function TransactionsPage() {
   const filteredTransactions = transactions.filter(txn => {
     const txnDate = new Date(txn.date)
     const now = new Date()
+    // Si activé, ne garder que les transactions du mois en cours
+    if (showOnlyCurrentMonth) {
+      if (txnDate.getMonth() !== now.getMonth() || txnDate.getFullYear() !== now.getFullYear()) {
+        return false
+      }
+    }
     if (showUpcoming) {
       // Si showUpcoming est activé, on affiche uniquement les transactions futures
       if (txnDate <= now) {
@@ -151,6 +174,12 @@ export default function TransactionsPage() {
     try {
       await fetch(`/api/expenses/${id}`, { method: 'DELETE' })
       setTransactions(transactions.filter(t => t.id !== id))
+      // Notify other components (eg. CreditTrackingCard) that credits changed
+      try {
+        window.dispatchEvent(new CustomEvent('credits:changed'))
+      } catch (e) {
+        // ignore in non-browser env
+      }
     } catch (error) {
       console.error('Erreur lors de la suppression:', error)
     }
@@ -360,6 +389,19 @@ export default function TransactionsPage() {
                   >
                     <RefreshCw className="w-4 h-4" />
                     <span className="hidden xs:inline">{showUpcoming ? 'Masquer futures' : 'Voir futures'}</span>
+                  </Button>
+                  <Button
+                    variant={showOnlyCurrentMonth ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setShowOnlyCurrentMonth(!showOnlyCurrentMonth)}
+                    className={`flex items-center gap-1 px-2 py-1 text-xs sm:text-sm rounded-lg transition-all duration-200 ${
+                      showOnlyCurrentMonth
+                        ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white'
+                        : 'bg-slate-700/50 border-slate-600/50 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    <Calendar className="w-4 h-4" />
+                    <span className="hidden xs:inline">{showOnlyCurrentMonth ? 'Mois courant' : 'Tous mois'}</span>
                   </Button>
                 </div>
               </div>

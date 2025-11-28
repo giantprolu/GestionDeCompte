@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Wallet, TrendingDown, TrendingUp, Settings, ArrowUpCircle, ArrowDownCircle, Eye, Edit } from 'lucide-react'
+import { Wallet, TrendingDown, TrendingUp, Settings, Eye, Edit } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
@@ -13,6 +13,7 @@ interface Account {
   name: string
   type: string
   currentBalance: number
+  initialBalance?: number
   icon: string
   color: string
 }
@@ -25,6 +26,7 @@ interface Transaction {
   type: 'income' | 'expense'
   category: string
   account_name: string
+  note?: string | null
   is_recurring: boolean
   category_icon?: string
 }
@@ -223,7 +225,7 @@ export default function PartagePage() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-xl md:text-3xl font-bold text-white">
-                      {boursoAccount ? `${boursoAccount.currentBalance.toFixed(2)} €` : '0.00 €'}
+                      {boursoAccount ? `${(boursoAccount.initialBalance ?? boursoAccount.currentBalance).toFixed(2)} €` : '0.00 €'}
                     </div>
                     <p className="text-xs text-slate-400 mt-1">Dépenses occasionnelles</p>
                   </CardContent>
@@ -244,7 +246,7 @@ export default function PartagePage() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-xl md:text-3xl font-bold text-white">
-                      {caisseAccount ? `${caisseAccount.currentBalance.toFixed(2)} €` : '0.00 €'}
+                      {caisseAccount ? `${(caisseAccount.initialBalance ?? caisseAccount.currentBalance).toFixed(2)} €` : '0.00 €'}
                     </div>
                     <p className="text-xs text-slate-400 mt-1">Dépenses obligatoires</p>
                   </CardContent>
@@ -332,42 +334,57 @@ export default function PartagePage() {
                     <p className="text-muted-foreground text-center py-8 text-sm">Aucune transaction</p>
                   ) : (
                     <div className="space-y-3 max-h-[500px] overflow-y-auto">
-                      {dashboard.transactions.map((transaction) => (
-                        <div
-                          key={transaction.id}
-                          className="flex items-center justify-between py-3 px-3 rounded-lg bg-slate-700/30 border border-slate-600/30 hover:bg-slate-700/50 transition-all"
-                        >
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <div 
-                              className="w-10 h-10 rounded-full flex items-center justify-center text-lg shadow-md flex-shrink-0"
-                              style={{ backgroundColor: (transaction.category_icon ? '#3b82f6' : '#6b7280') + '30' }}
-                            >
-                              {transaction.category_icon || '📦'}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-sm text-white truncate">{transaction.description}</p>
-                              <div className="flex flex-wrap items-center gap-1 md:gap-2 text-xs text-slate-400 mt-1">
-                                <span className="truncate">{transaction.category}</span>
-                                <span className="hidden md:inline">•</span>
-                                <span className="truncate">{transaction.account_name}</span>
-                                <span className="hidden sm:inline">•</span>
-                                <span className="whitespace-nowrap">{new Date(transaction.date).toLocaleDateString('fr-FR')}</span>
+                      {dashboard.transactions.map((transaction) => {
+                        const isFuture = new Date(transaction.date) > new Date()
+                        return (
+                          <div
+                            key={transaction.id}
+                            className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all hover:shadow-lg ${
+                              isFuture
+                                ? 'bg-gradient-to-br from-blue-900/20 to-blue-800/20 border-blue-500/30 backdrop-blur-sm'
+                                : transaction.type === 'income'
+                                  ? 'bg-gradient-to-br from-green-900/20 to-green-800/20 border-green-500/30'
+                                  : 'bg-gradient-to-br from-red-900/20 to-red-800/20 border-red-500/30'
+                            }`}
+                          >
+                            <div className="flex items-start gap-3 md:gap-4 flex-1 min-w-0">
+                              <div 
+                                className="w-11 h-11 md:w-14 md:h-14 rounded-2xl flex items-center justify-center text-xl md:text-3xl flex-shrink-0 shadow-lg border-2"
+                                style={{ backgroundColor: (transaction.category_icon ? '#3b82f6' : '#6b7280') + '30', borderColor: (transaction.category_icon ? '#3b82f6' : '#6b7280') + '60' }}
+                              >
+                                {transaction.category_icon || '📦'}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-bold text-base md:text-lg text-white mb-1.5">{transaction.category || transaction.description}</p>
+                                {transaction.description && transaction.description !== transaction.category && (
+                                  <p className="text-xs text-slate-400 italic mb-1">{transaction.description}</p>
+                                )}
                                 {transaction.is_recurring && (
-                                  <>
-                                    <span className="hidden sm:inline">•</span>
-                                    <span className="text-blue-400 whitespace-nowrap">↻ Récurrent</span>
-                                  </>
+                                  <div className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-400/30 text-xs font-semibold mb-1.5">
+                                    <span>↻ Récurrent</span>
+                                  </div>
+                                )}
+                                {isFuture && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 border border-blue-400/30 text-xs font-medium mb-1.5 ml-1.5">
+                                    Future
+                                  </span>
+                                )}
+                                <p className="text-xs md:text-sm text-slate-400 font-medium">{transaction.account_name} • {new Date(transaction.date).toLocaleDateString('fr-FR')}</p>
+                                {transaction.note && (
+                                  <p className="text-xs text-slate-500 mt-1 italic">{transaction.note}</p>
                                 )}
                               </div>
                             </div>
+                            <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
+                              <span className={`text-base md:text-xl font-bold ${
+                                transaction.type === 'income' ? 'text-green-400' : 'text-red-400'
+                              }`}>
+                                {transaction.type === 'income' ? '+' : '-'}{Math.abs(transaction.amount).toFixed(2)} €
+                              </span>
+                            </div>
                           </div>
-                          <div className="text-right ml-3 flex-shrink-0">
-                            <p className={`font-bold text-sm md:text-base ${transaction.type === 'income' ? 'text-green-400' : 'text-red-400'}`}>
-                              {transaction.type === 'income' ? '+' : '-'}{Math.abs(transaction.amount).toFixed(2)} €
-                            </p>
-                          </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   )}
                 </CardContent>

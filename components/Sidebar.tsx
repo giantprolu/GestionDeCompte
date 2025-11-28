@@ -17,6 +17,7 @@ const navItems: NavItem[] = [
   { href: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
   { href: '/comptes', label: 'Comptes', icon: Wallet },
   { href: '/partage', label: 'Partage', icon: Share2 },
+    { href: '/previsionnel', label: 'Prévisonnel', icon: Sparkles },
 ]
 
 interface SidebarProps {

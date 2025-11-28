@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { getBaseInitial, getCurrentBalance as getCurrentBalanceUtil } from '@/lib/balances'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -67,17 +68,11 @@ export default function ComptesPage() {
       }
     }
 
-    // Calculer le solde courant pour chaque compte
+    // Calculer le solde courant pour chaque compte (utilise l'utilitaire centralisé)
     const getCurrentBalance = (accountId: string) => {
       const account = accounts.find(acc => acc.id === accountId)
       if (!account) return 0
-      const accountTransactions = transactions.filter(txn => txn.accountId === accountId)
-      let balance = account.initialBalance
-      accountTransactions.forEach(txn => {
-        if (txn.type === 'income') balance += txn.amount
-        else if (txn.type === 'expense') balance -= txn.amount
-      })
-      return balance
+      return getBaseInitial(account, balances)
     }
 
   const handleUpdateBalance = async (accountId: string) => {
@@ -242,7 +237,7 @@ export default function ComptesPage() {
                               {getCurrentBalance(account.id).toFixed(2)} €
                             </div>
                             <p className="text-xs text-slate-500 mt-1">
-                              Initial: {account.initialBalance.toFixed(2)} €
+                              Initial: {(typeof balances[account.id] === 'number' ? balances[account.id] : account.initialBalance).toFixed(2)} €
                             </p>
                           </div>
                         {(account.isOwner || account.permission === 'edit') && (

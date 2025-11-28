@@ -52,6 +52,35 @@ export async function DELETE(
       }
     }
 
+    // Si la transaction est liée à un crédit, mettre à jour outstanding
+    try {
+      const creditId = transaction.credit_id
+      if (creditId) {
+        const { data: credit } = await supabase
+          .from('credits')
+          .select('*')
+          .eq('id', creditId)
+          .single()
+
+        if (credit) {
+          // Une transaction de type 'expense' qui a `credit_id` est probablement
+          // un remboursement ; lors de la suppression, on doit augmenter outstanding
+          // du montant supprimé.
+          const prevOutstanding = Number(credit.outstanding ?? credit.principal ?? 0)
+          const newOutstanding = prevOutstanding + montant
+          const updates: any = { outstanding: newOutstanding }
+          if (newOutstanding > 0) updates.is_closed = false
+
+          await supabase
+            .from('credits')
+            .update(updates)
+            .eq('id', creditId)
+        }
+      }
+    } catch (err) {
+      console.error('Erreur mise à jour crédit lors suppression transaction:', err)
+    }
+
     const { error } = await supabase
       .from('transactions')
       .delete()
