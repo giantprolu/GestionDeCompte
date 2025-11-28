@@ -29,6 +29,7 @@ interface Transaction {
   note?: string | null
   is_recurring: boolean
   category_icon?: string
+  archived?: boolean
 }
 
 interface DashboardData {
@@ -335,6 +336,7 @@ export default function PartagePage() {
                   ) : (
                     <div className="space-y-3 max-h-[500px] overflow-y-auto">
                       {dashboard.transactions.map((transaction) => {
+                        if (transaction.archived) return null;
                         const isFuture = new Date(transaction.date) > new Date()
                         return (
                           <div

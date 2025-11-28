@@ -19,7 +19,6 @@
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-tabs": "^1.1.13",
     "@supabase/supabase-js": "^2.84.0",
-    
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
@@ -42,6 +41,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "baseline-browser-mapping": "^2.8.32",
     "eslint": "^9",
     "eslint-config-next": "16.0.3",
     "jsdom": "^27.2.0",

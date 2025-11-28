@@ -70,6 +70,7 @@ export async function GET(request: Request) {
       isActive: txn.is_active,
       createdAt: txn.created_at,
       updatedAt: txn.updated_at,
+      archived: txn.archived,
     }))
     
     return NextResponse.json(mappedTransactions)

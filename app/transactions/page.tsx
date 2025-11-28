@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Plus, Filter, Trash2, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react'
+import { getMonthClosure } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import TransactionForm from '@/components/TransactionForm'
 import RecurringTransactionForm from '@/components/RecurringTransactionForm'
@@ -13,6 +14,7 @@ import { Calendar, Wallet } from "lucide-react";
 interface Account {
   id: string
   name: string
+  ownerUserId?: string
 }
 
 interface Category {
@@ -36,10 +38,12 @@ interface Transaction {
   isRecurring?: boolean
   recurrenceFrequency?: string
   recurrenceDay?: number
+  archived?: boolean
 }
 
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -57,6 +61,14 @@ export default function TransactionsPage() {
   useEffect(() => {
     fetchData()
   }, [])
+
+  // Met à jour le mois sélectionné au chargement des transactions
+  useEffect(() => {
+    if (transactions.length === 0) return;
+    const latest = transactions.reduce((max, txn) => new Date(txn.date) > new Date(max.date) ? txn : max, transactions[0]);
+    const d = new Date(latest.date);
+    setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }, [transactions]);
 
   // Vérifie périodiquement si le mois a changé et recharge les données si nécessaire
   const currentMonthRef = useRef(`${new Date().getMonth()}-${new Date().getFullYear()}`)
@@ -94,79 +106,57 @@ export default function TransactionsPage() {
     }
   }
 
-  // Filtrer les transactions côté client
-  const filteredTransactions = transactions.filter(txn => {
-    const txnDate = new Date(txn.date)
-    const now = new Date()
-    // Si activé, ne garder que les transactions du mois en cours
-    if (showOnlyCurrentMonth) {
-      if (txnDate.getMonth() !== now.getMonth() || txnDate.getFullYear() !== now.getFullYear()) {
-        return false
-      }
+  // Filtrer les transactions côté client, en excluant celles archivées
+  // Filtrage selon la période de clôture du mois sélectionné
+  const [monthClosure, setMonthClosureState] = useState<{ start_date: string, end_date: string } | null>(null)
+
+  useEffect(() => {
+    async function fetchClosure() {
+      // Récupérer l'utilisateur courant (à adapter selon votre auth)
+      const userId = accounts.find(acc => acc.ownerUserId)?.ownerUserId
+      if (!userId) return
+      const closure = await getMonthClosure(userId, selectedMonth)
+      setMonthClosureState(closure)
     }
-    if (showUpcoming) {
-      // Si showUpcoming est activé, on affiche uniquement les transactions futures
-      if (txnDate <= now) {
-        return false
-      }
-    } else {
-      // Sinon, on masque les transactions futures
-      if (txnDate > now) {
-        return false
-      }
-    }
-    // Filtre par type (après le filtrage des dates)
-    if (typeFilter !== 'all' && txn.type !== typeFilter) {
-      return false
-    }
-    // Filtre par recherche texte globale
-    if (search.trim() !== '') {
-      const lower = search.trim().toLowerCase()
-      const fields = [
-        txn.category?.name,
-        txn.category?.icon,
-        txn.account?.name,
-        txn.note,
-        txn.amount?.toString(),
-        txn.date
-      ].map(v => (v || '').toString().toLowerCase())
-      if (!fields.some(f => f.includes(lower))) {
-        return false
-      }
-    }
-    // Filtre par date exacte
-    if (searchDate.trim() !== '') {
-      const dateStr = new Date(txn.date).toISOString().split('T')[0]
-      if (!dateStr.includes(searchDate.trim())) {
-        return false
-      }
-    }
-    // Filtre par montant
-    if (searchAmount.trim() !== '') {
-      if (!txn.amount.toString().includes(searchAmount.trim())) {
-        return false
-      }
-    }
-    // Filtre par nom de transaction (catégorie)
-    if (searchCategory.trim() !== '') {
-      if (!txn.category?.name?.toLowerCase().includes(searchCategory.trim().toLowerCase())) {
-        return false
-      }
-    }
-    // Filtre par nom de compte
-    if (searchAccount.trim() !== '') {
-      if (!txn.account?.name?.toLowerCase().includes(searchAccount.trim().toLowerCase())) {
-        return false
-      }
-    }
-    // Filtre par description (note)
-    if (searchNote.trim() !== '') {
-      if (!txn.note?.toLowerCase().includes(searchNote.trim().toLowerCase())) {
-        return false
-      }
-    }
-    return true
-  })
+    fetchClosure()
+  }, [selectedMonth, accounts])
+
+  const filteredTransactions = monthClosure
+    ? transactions.filter(txn => {
+        if (txn.archived) return false;
+        if (txn.date < monthClosure.start_date || txn.date > monthClosure.end_date) return false;
+        if (typeFilter !== 'all' && txn.type !== typeFilter) return false;
+        if (search.trim() !== '') {
+          const lower = search.trim().toLowerCase();
+          const fields = [
+            txn.category?.name,
+            txn.category?.icon,
+            txn.account?.name,
+            txn.note,
+            txn.amount?.toString(),
+            txn.date
+          ].map(v => (v || '').toString().toLowerCase());
+          if (!fields.some(f => f.includes(lower))) return false;
+        }
+        if (searchDate.trim() !== '') {
+          const dateStr = new Date(txn.date).toISOString().split('T')[0];
+          if (!dateStr.includes(searchDate.trim())) return false;
+        }
+        if (searchAmount.trim() !== '') {
+          if (!txn.amount.toString().includes(searchAmount.trim())) return false;
+        }
+        if (searchCategory.trim() !== '') {
+          if (!txn.category?.name?.toLowerCase().includes(searchCategory.trim().toLowerCase())) return false;
+        }
+        if (searchAccount.trim() !== '') {
+          if (!txn.account?.name?.toLowerCase().includes(searchAccount.trim().toLowerCase())) return false;
+        }
+        if (searchNote.trim() !== '') {
+          if (!txn.note?.toLowerCase().includes(searchNote.trim().toLowerCase())) return false;
+        }
+        return true;
+      })
+    : [];
 
   const handleDeleteTransaction = async (id: string) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cette transaction ?')) return
@@ -210,6 +200,24 @@ export default function TransactionsPage() {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-4 md:space-y-6 pb-20 md:pb-8"
     >
+      {/* Onglets de sélection de mois */}
+      <div className="mb-4">
+        <div className="flex gap-2 overflow-x-auto">
+          {Array.from(new Set(transactions.map(txn => {
+            const d = new Date(txn.date)
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+          }))).sort().reverse().map(month => (
+            <Button
+              key={month}
+              variant={month === selectedMonth ? 'default' : 'outline'}
+              className={month === selectedMonth ? 'font-bold bg-blue-600 text-white' : ''}
+              onClick={() => setSelectedMonth(month)}
+            >
+              {new Date(month + '-01').toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}
+            </Button>
+          ))}
+        </div>
+      </div>
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <h1 className="text-3xl md:text-4xl font-bold text-white drop-shadow-lg">Transactions</h1>
         <Button 

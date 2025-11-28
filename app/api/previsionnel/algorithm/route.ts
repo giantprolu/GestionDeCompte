@@ -25,7 +25,6 @@ const FIXED_KEYWORDS = [
 export async function POST(request: Request) {
   try {
     const { userId } = await auth()
-    console.log('[algorithm] POST called', { userId })
     if (!userId) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
     const body = await request.json().catch(() => ({}))
@@ -34,27 +33,22 @@ export async function POST(request: Request) {
     const ratioMin = Number(body.ratioMin ?? 0.6)
     const perCategoryMin = Number(body.perCategoryMin ?? 10)
     const objectifs = body.targets || {};
-    console.log('[algorithm] Params', { monthsWindow, savingsRate, ratioMin, perCategoryMin, objectifs })
 
     // load user's accounts
     const { data: accounts } = await supabase
       .from('accounts')
       .select('id')
       .eq('user_id', userId)
-    console.log('[algorithm] Accounts', accounts)
 
     const accountIds = (accounts || []).map((a: any) => a.id)
-    console.log('[algorithm] Account IDs', accountIds)
 
     if (accountIds.length === 0) {
-      console.log('[algorithm] Aucun compte trouvé')
       return NextResponse.json({ error: 'Aucun compte trouvé' }, { status: 400 })
     }
 
     // period
     const end = new Date()
     const start = new Date(end.getFullYear(), end.getMonth() - monthsWindow + 1, 1)
-    console.log('[algorithm] Period', { start, end })
 
     // fetch transactions for accounts in window
     const { data: txs, error } = await supabase
@@ -62,15 +56,12 @@ export async function POST(request: Request) {
       .select('amount,date,type,category:categories(name)')
       .in('account_id', accountIds)
       .gte('date', start.toISOString())
-    console.log('[algorithm] Transactions', txs)
 
     if (error) {
-      console.log('[algorithm] Supabase error', error)
       throw error
     }
 
     const transactions = txs || []
-    console.log('[algorithm] Transactions count', transactions.length)
 
     // Regrouper les transactions par catégorie
     const txByCat: Record<string, number[]> = {}

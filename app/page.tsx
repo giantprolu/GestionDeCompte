@@ -1,7 +1,12 @@
-'use client'
+"use client"
+
+// ...existing code...
+
+// ...existing code...
 
 import { useEffect, useState } from 'react'
 import { getBaseInitial, sumBalances } from '@/lib/balances'
+import { getMonthClosure } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { Wallet, TrendingDown, TrendingUp, Calendar, ArrowUpCircle, ArrowDownCircle } from 'lucide-react'
@@ -36,12 +41,61 @@ interface Transaction {
   date: string
   accountId: string
   category: Category
+  archived?: boolean
 }
 
 export default function Home() {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Générer la liste des mois disponibles à partir des transactions
+  const allMonths = Array.from(new Set(transactions.map(txn => {
+    const d = new Date(txn.date)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  }))).sort().reverse()
+
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  })
+
+  // Filtrer les transactions selon la période de clôture du mois sélectionné
+  const [monthClosure, setMonthClosureState] = useState<{ start_date: string, end_date: string } | null>(null)
+
+  useEffect(() => {
+    async function fetchClosure() {
+      // Récupérer l'utilisateur courant (à adapter selon votre auth)
+      const userId = accounts.find(acc => acc.ownerUserId)?.ownerUserId
+      if (!userId) return
+      const closure = await getMonthClosure(userId, selectedMonth)
+      setMonthClosureState(closure)
+    }
+    fetchClosure()
+  }, [selectedMonth, accounts])
+
+  const monthTransactions = monthClosure
+    ? transactions.filter(txn => txn.date >= monthClosure.start_date && txn.date <= monthClosure.end_date && !txn.archived)
+    : []
+
+  // Reset des indicateurs selon le mois sélectionné
+  const totalMonthIncome = monthTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0)
+  const totalMonthExpenses = monthTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0)
+  const monthBalance = totalMonthIncome - totalMonthExpenses
+  const expensesByCategory = monthTransactions.filter(t => t.type === 'expense').reduce((acc: Record<string, { amount: number, category: Category }>, txn) => {
+    if (!acc[txn.categoryId]) {
+      acc[txn.categoryId] = { amount: 0, category: txn.category }
+    }
+    acc[txn.categoryId].amount += txn.amount
+    return acc
+  }, {})
+  const pieData = Object.values(expensesByCategory).map(item => ({
+    name: item.category.name,
+    value: item.amount,
+    color: item.category.color,
+    icon: item.category.icon,
+  })).sort((a, b) => b.value - a.value).slice(0, 5)
+  const recentTransactions = [...monthTransactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5)
 
   useEffect(() => {
     fetchData()
@@ -76,49 +130,7 @@ export default function Home() {
 
   // Calcul des transactions du mois en cours
   const now = new Date()
-  const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-
-  const monthTransactions = transactions.filter(txn => {
-    const txnDate = new Date(txn.date)
-    return txnDate >= firstDayOfMonth
-  })
-
-  const totalMonthIncome = monthTransactions
-    .filter(t => t.type === 'income')
-    .reduce((sum, t) => sum + t.amount, 0)
-
-  const totalMonthExpenses = monthTransactions
-    .filter(t => t.type === 'expense')
-    .reduce((sum, t) => sum + t.amount, 0)
-
-  const monthBalance = totalMonthIncome - totalMonthExpenses
-
-  // Données pour le graphique des dépenses par catégorie
-  const expensesByCategory = monthTransactions
-    .filter(t => t.type === 'expense')
-    .reduce((acc: Record<string, { amount: number, category: Category }>, txn) => {
-      if (!acc[txn.categoryId]) {
-        acc[txn.categoryId] = { amount: 0, category: txn.category }
-      }
-      acc[txn.categoryId].amount += txn.amount
-      return acc
-    }, {})
-
-  // Formatage des données pour le PieChart
-  const pieData = Object.values(expensesByCategory)
-    .map(item => ({
-      name: item.category.name,
-      value: item.amount,
-      color: item.category.color,
-      icon: item.category.icon,
-    }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 5) // Top 5 catégories
-
-  // Dernières transactions
-  const recentTransactions = [...transactions]
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 5)
+  // ...existing code...
 
   const boursoAccount = accounts.find(acc => acc.type === 'ponctuel' && acc.isOwner !== false)
   const caisseAccount = accounts.find(acc => acc.type === 'obligatoire' && acc.isOwner !== false)
@@ -131,19 +143,60 @@ export default function Home() {
     return <div className="text-center py-12">Chargement...</div>
   }
 
+  // Fonction pour appliquer le changement de mois
+  const handleChangeMonth = async () => {
+    try {
+      const res = await fetch('/api/change-month', { method: 'POST' })
+      const data = await res.json()
+      if (data.success) {
+        // Recharger les données pour mettre à jour l'affichage
+        await fetchData()
+        alert('Changement de mois appliqué !')
+      } else {
+        alert('Erreur : ' + (data.error || 'Impossible d’archiver les transactions'))
+      }
+    } catch (error) {
+      alert('Erreur serveur : ' + error)
+    }
+  };
+
   return (
     <div className="space-y-6 md:space-y-8 pb-20 md:pb-8">
+      {/* Onglets de sélection de mois */}
+      <div className="mb-4">
+        <div className="flex gap-2 overflow-x-auto">
+          {allMonths.map(month => (
+            <Button
+              key={month}
+              variant={month === selectedMonth ? 'default' : 'outline'}
+              className={month === selectedMonth ? 'font-bold bg-blue-600 text-white' : ''}
+              onClick={() => setSelectedMonth(month)}
+            >
+              {new Date(month + '-01').toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}
+            </Button>
+          ))}
+        </div>
+      </div>
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div>
           <h1 className="text-3xl md:text-4xl font-bold text-white drop-shadow-lg">Tableau de bord</h1>
           <p className="text-slate-200 mt-2 text-base md:text-lg font-medium">Vue d'ensemble de vos finances</p>
         </div>
-        <Link href="/transactions">
-          <Button className="w-full md:w-auto bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200 px-6 py-6 text-base">
-            <TrendingUp className="w-5 h-5 mr-2" />
-            Voir les transactions
+        <div className="flex flex-col gap-2 md:flex-row md:items-center">
+          <Button
+            className="w-full md:w-auto bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200 px-6 py-6 text-base"
+            onClick={handleChangeMonth}
+          >
+            <Calendar className="w-5 h-5 mr-2" />
+            Débit d’un nouveau mois
           </Button>
-        </Link>
+          <Link href="/transactions">
+            <Button className="w-full md:w-auto bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200 px-6 py-6 text-base">
+              <TrendingUp className="w-5 h-5 mr-2" />
+              Voir les transactions
+            </Button>
+          </Link>
+        </div>
       </div>
       {/* Cards des comptes */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
