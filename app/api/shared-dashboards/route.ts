@@ -38,6 +38,15 @@ interface MonthClosure {
   end_date: string
 }
 
+interface CreditEntry {
+  id: string
+  title: string
+  principal: number
+  outstanding: number
+  note?: string
+  start_date: string
+}
+
 interface DashboardData {
   ownerUserId: string
   ownerUsername: string
@@ -45,6 +54,7 @@ interface DashboardData {
   shareId: string
   accounts: Account[]
   transactions: Transaction[]
+  credits: CreditEntry[]
   totalBalance: number
   monthlyIncome: number
   monthlyExpense: number
@@ -106,6 +116,13 @@ export async function GET(request: NextRequest) {
         endDate.setDate(endDate.getDate() + 1)
         currentMonthStart = endDate.toISOString().split('T')[0]
       }
+
+      // Récupérer les crédits du propriétaire
+      const { data: ownerCredits } = await supabase
+        .from('credits')
+        .select('*')
+        .eq('user_id', ownerId)
+        .order('start_date', { ascending: false })
 
       // Récupérer les transactions du propriétaire (uniquement passées ou aujourd'hui)
       const accountIds = ownerAccounts?.map(acc => acc.id) || []
@@ -212,6 +229,16 @@ export async function GET(request: NextRequest) {
         archived: t.archived || false
       })) || []
 
+      // Formater les crédits
+      const credits: CreditEntry[] = ownerCredits?.map(c => ({
+        id: c.id,
+        title: c.title || 'Crédit',
+        principal: c.principal || 0,
+        outstanding: c.outstanding ?? c.principal ?? 0,
+        note: c.note,
+        start_date: c.start_date || c.created_at
+      })) || []
+
       dashboardsByOwner[ownerId] = {
         ownerUserId: ownerId,
         ownerUsername: '', // À remplir avec Clerk
@@ -219,6 +246,7 @@ export async function GET(request: NextRequest) {
         shareId: share.id,
         accounts,
         transactions,
+        credits,
         totalBalance,
         monthlyIncome,
         monthlyExpense,

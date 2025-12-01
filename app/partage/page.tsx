@@ -5,7 +5,7 @@ import { useUser } from '@clerk/nextjs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Wallet, TrendingDown, TrendingUp, Settings, Eye, Edit, Filter, X, Search, Calculator, Target } from 'lucide-react'
+import { Wallet, TrendingDown, TrendingUp, Settings, Eye, Edit, Filter, X, Search, Calculator, Target, CreditCard, CircleDollarSign } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts'
@@ -40,6 +40,15 @@ interface MonthClosure {
   end_date: string
 }
 
+interface CreditEntry {
+  id: string
+  title: string
+  principal: number
+  outstanding: number
+  note?: string
+  start_date: string
+}
+
 interface DashboardData {
   ownerUserId: string
   ownerUsername: string
@@ -47,6 +56,7 @@ interface DashboardData {
   shareId: string
   accounts: Account[]
   transactions: Transaction[]
+  credits: CreditEntry[]
   totalBalance: number
   monthlyIncome: number
   monthlyExpense: number
@@ -83,7 +93,7 @@ export default function PartagePage() {
   const [chartMode, setChartMode] = useState<Record<string, 'week' | 'month' | 'year'>>({})
   
   // Vue active par dashboard (transactions ou previsionnel)
-  const [activeView, setActiveView] = useState<Record<string, 'transactions' | 'previsionnel'>>({})
+  const [activeView, setActiveView] = useState<Record<string, 'transactions' | 'previsionnel' | 'credits'>>({})
   
   // Données prévisionnelles par dashboard
   const [previsionnelData, setPrevisionnelData] = useState<Record<string, PrevisionnelData>>({})
@@ -396,11 +406,28 @@ export default function PartagePage() {
             
             return weeks.map(w => ({ label: w.label, amount: w.amount }))
           } else {
+            // Mode année : utiliser les clôtures de mois pour grouper les dépenses
             const monthsData: Record<string, number> = {}
-            dashboard.transactions.filter(t => t.type === 'expense').forEach(t => {
-              const monthKey = t.date.substring(0, 7)
-              monthsData[monthKey] = (monthsData[monthKey] || 0) + t.amount
+            
+            // D'abord, calculer les dépenses pour chaque mois clôturé
+            dashboard.monthClosures?.forEach(closure => {
+              const closureTransactions = dashboard.transactions.filter(t => 
+                t.type === 'expense' && 
+                t.date >= closure.start_date && 
+                t.date <= closure.end_date
+              )
+              monthsData[closure.month_year] = closureTransactions.reduce((sum, t) => sum + t.amount, 0)
             })
+            
+            // Ajouter le mois courant (transactions non archivées)
+            const currentMonthTransactions = dashboard.transactions.filter(t => 
+              t.type === 'expense' && !t.archived
+            )
+            if (currentMonthTransactions.length > 0) {
+              const now = new Date()
+              const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+              monthsData[currentKey] = currentMonthTransactions.reduce((sum, t) => sum + t.amount, 0)
+            }
             
             return Object.entries(monthsData)
               .sort(([a], [b]) => a.localeCompare(b))
@@ -468,8 +495,8 @@ export default function PartagePage() {
                   </div>
                   
                   <div className="flex flex-col gap-2">
-                    {/* Onglets Transactions / Prévisionnel */}
-                    <div className="flex gap-1">
+                    {/* Onglets Transactions / Prévisionnel / Crédits */}
+                    <div className="flex gap-1 flex-wrap">
                       <Button
                         size="sm"
                         variant={currentView === 'transactions' ? 'default' : 'outline'}
@@ -493,6 +520,15 @@ export default function PartagePage() {
                       >
                         <Calculator className="w-3 h-3 mr-1" />
                         Prévisionnel
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={currentView === 'credits' ? 'default' : 'outline'}
+                        className={`text-xs px-3 py-1 h-7 ${currentView === 'credits' ? 'bg-purple-600' : ''}`}
+                        onClick={() => setActiveView(prev => ({ ...prev, [dashboard.ownerUserId]: 'credits' }))}
+                      >
+                        <CreditCard className="w-3 h-3 mr-1" />
+                        Crédits
                       </Button>
                     </div>
                     
@@ -718,6 +754,134 @@ export default function PartagePage() {
                   ) : (
                     <div className="text-center py-8">
                       <p className="text-muted-foreground text-sm">Aucune dépense pour cette période</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Section Crédits */}
+            {currentView === 'credits' && (
+              <Card className="bg-gradient-to-br from-slate-800 to-slate-900 shadow-xl">
+                <CardHeader className="border-b border-slate-700/50 pb-3">
+                  <CardTitle className="text-base md:text-lg flex items-center gap-2">
+                    <CreditCard className="w-5 h-5 text-orange-400" />
+                    Suivi des Crédits
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Crédits et emprunts en cours
+                  </p>
+                </CardHeader>
+                <CardContent className="pt-4">
+                  {dashboard.credits && dashboard.credits.length > 0 ? (
+                    <div className="space-y-3">
+                      {/* Résumé des crédits */}
+                      <div className="grid grid-cols-3 gap-2 mb-4">
+                        <div className="p-3 rounded-lg bg-orange-900/20 border border-orange-500/30">
+                          <p className="text-[10px] text-orange-300/70 uppercase tracking-wide">Total emprunté</p>
+                          <p className="text-lg font-bold text-orange-400">
+                            {dashboard.credits.reduce((sum, c) => sum + c.principal, 0).toFixed(2)} €
+                          </p>
+                        </div>
+                        <div className="p-3 rounded-lg bg-green-900/20 border border-green-500/30">
+                          <p className="text-[10px] text-green-300/70 uppercase tracking-wide">Remboursé</p>
+                          <p className="text-lg font-bold text-green-400">
+                            {dashboard.credits.reduce((sum, c) => sum + (c.principal - c.outstanding), 0).toFixed(2)} €
+                          </p>
+                        </div>
+                        <div className="p-3 rounded-lg bg-red-900/20 border border-red-500/30">
+                          <p className="text-[10px] text-red-300/70 uppercase tracking-wide">Restant dû</p>
+                          <p className="text-lg font-bold text-red-400">
+                            {dashboard.credits.reduce((sum, c) => sum + c.outstanding, 0).toFixed(2)} €
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {/* Barre de progression globale */}
+                      {(() => {
+                        const totalPrincipal = dashboard.credits.reduce((sum, c) => sum + c.principal, 0)
+                        const totalOutstanding = dashboard.credits.reduce((sum, c) => sum + c.outstanding, 0)
+                        const globalProgress = totalPrincipal > 0 ? ((totalPrincipal - totalOutstanding) / totalPrincipal) * 100 : 0
+                        
+                        return (
+                          <div className="mb-4 p-3 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs text-slate-400">Progression globale</span>
+                              <span className="text-sm font-semibold text-white">{globalProgress.toFixed(0)}%</span>
+                            </div>
+                            <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-gradient-to-r from-orange-500 to-green-500 rounded-full transition-all duration-500"
+                                style={{ width: `${globalProgress}%` }}
+                              />
+                            </div>
+                          </div>
+                        )
+                      })()}
+                      
+                      {/* Liste des crédits */}
+                      <div className="space-y-2">
+                        {dashboard.credits.map((credit) => {
+                          const progress = credit.principal > 0 ? ((credit.principal - credit.outstanding) / credit.principal) * 100 : 0
+                          const isFullyPaid = credit.outstanding <= 0
+                          
+                          return (
+                            <div 
+                              key={credit.id} 
+                              className={`p-3 rounded-lg border transition-all ${
+                                isFullyPaid 
+                                  ? 'bg-green-900/20 border-green-500/30' 
+                                  : 'bg-slate-800/50 border-slate-700/50'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <CircleDollarSign className={`w-4 h-4 ${isFullyPaid ? 'text-green-400' : 'text-orange-400'}`} />
+                                  <span className="text-sm font-medium text-white">{credit.title}</span>
+                                  {isFullyPaid && (
+                                    <span className="px-1.5 py-0.5 text-[10px] bg-green-500/20 text-green-400 rounded-full">
+                                      Remboursé
+                                    </span>
+                                  )}
+                                </div>
+                                <span className={`text-sm font-bold ${isFullyPaid ? 'text-green-400' : 'text-white'}`}>
+                                  {credit.principal.toFixed(2)} €
+                                </span>
+                              </div>
+                              
+                              {/* Barre de progression */}
+                              <div className="mb-2">
+                                <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                                  <div 
+                                    className={`h-full rounded-full transition-all duration-300 ${
+                                      isFullyPaid ? 'bg-green-500' : progress > 50 ? 'bg-orange-400' : 'bg-orange-500'
+                                    }`}
+                                    style={{ width: `${progress}%` }}
+                                  />
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-slate-400">
+                                  Restant: <span className={isFullyPaid ? 'text-green-400' : 'text-red-400'}>{credit.outstanding.toFixed(2)} €</span>
+                                </span>
+                                <span className="text-slate-500">
+                                  {new Date(credit.start_date).toLocaleDateString('fr-FR')}
+                                </span>
+                              </div>
+                              
+                              {credit.note && (
+                                <p className="mt-2 text-[11px] text-slate-400 italic">{credit.note}</p>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <CreditCard className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                      <p className="text-muted-foreground text-sm">Aucun crédit en cours</p>
                     </div>
                   )}
                 </CardContent>
