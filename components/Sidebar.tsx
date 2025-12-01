@@ -1,23 +1,27 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, ArrowLeftRight, Wallet, Share2, type LucideIcon, Sparkles } from 'lucide-react'
+import { Home, ArrowLeftRight, Wallet, Share2, type LucideIcon, Sparkles, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton } from '@clerk/nextjs'
+import { useUserSettings } from '@/components/AppWrapper'
 
 interface NavItem {
   href: string
   label: string
   icon: LucideIcon
+  viewerOnly?: boolean  // true = visible uniquement pour les visionneurs
+  userOnly?: boolean    // true = visible uniquement pour les utilisateurs complets
 }
 
 const navItems: NavItem[] = [
-  { href: '/', label: 'Dashboard', icon: Home },
-  { href: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
-  { href: '/comptes', label: 'Comptes', icon: Wallet },
+  { href: '/', label: 'Dashboard', icon: Home, userOnly: true },
+  { href: '/transactions', label: 'Transactions', icon: ArrowLeftRight, userOnly: true },
+  { href: '/comptes', label: 'Comptes', icon: Wallet, userOnly: true },
   { href: '/partage', label: 'Partage', icon: Share2 },
-    { href: '/previsionnel', label: 'Prévisonnel', icon: Sparkles },
+  { href: '/previsionnel', label: 'Prévisonnel', icon: Sparkles, userOnly: true },
 ]
 
 interface SidebarProps {
@@ -26,6 +30,23 @@ interface SidebarProps {
 
 export default function Sidebar({ children }: SidebarProps) {
   const pathname = usePathname()
+  const [mounted, setMounted] = useState(false)
+  const { userType } = useUserSettings()
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Filtrer les éléments de navigation selon le type d'utilisateur
+  const filteredNavItems = navItems.filter(item => {
+    // Si pas encore de type défini, montrer tout
+    if (!userType) return true
+    // Si l'item est réservé aux utilisateurs complets et qu'on est visionneur
+    if (item.userOnly && userType === 'viewer') return false
+    // Si l'item est réservé aux visionneurs et qu'on est utilisateur complet
+    if (item.viewerOnly && userType === 'user') return false
+    return true
+  })
 
   return (
     <div className="flex min-h-screen">
@@ -44,7 +65,7 @@ export default function Sidebar({ children }: SidebarProps) {
 
         {/* Navigation */}
         <nav className="space-y-2 flex-1">
-          {navItems.map((item) => {
+          {filteredNavItems.map((item) => {
             const Icon = item.icon
             const isActive = pathname === item.href
             
@@ -74,26 +95,35 @@ export default function Sidebar({ children }: SidebarProps) {
 
         {/* User Section */}
         <div className="mt-auto pt-6 border-t border-white/10">
-          <SignedOut>
-            <div className="space-y-2">
-              <SignInButton mode="modal">
-                <button className="w-full px-4 py-2.5 text-sm font-medium text-white bg-white/10 hover:bg-white/20 rounded-xl transition border border-white/10">
-                  Se connecter
-                </button>
-              </SignInButton>
-              <SignUpButton mode="modal">
-                <button className="w-full px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700 rounded-xl transition shadow-lg">
-                  S'inscrire
-                </button>
-              </SignUpButton>
-            </div>
-          </SignedOut>
-          <SignedIn>
-            <div className="flex items-center gap-3 px-4 py-3 glass rounded-xl border border-white/10">
-              <UserButton afterSignOutUrl="/" />
-              <span className="text-sm text-gray-300">Mon compte</span>
-            </div>
-          </SignedIn>
+          {mounted && (
+            <>
+              <SignedOut>
+                <div className="space-y-2">
+                  <SignInButton mode="modal">
+                    <button className="w-full px-4 py-2.5 text-sm font-medium text-white bg-white/10 hover:bg-white/20 rounded-xl transition border border-white/10">
+                      Se connecter
+                    </button>
+                  </SignInButton>
+                  <SignUpButton mode="modal">
+                    <button className="w-full px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700 rounded-xl transition shadow-lg">
+                      S'inscrire
+                    </button>
+                  </SignUpButton>
+                </div>
+              </SignedOut>
+              <SignedIn>
+                <div className="flex items-center gap-3 px-4 py-3 glass rounded-xl border border-white/10">
+                  <UserButton />
+                  <span className="text-sm text-gray-300 flex-1">Mon compte</span>
+                  <Link href="/parametres">
+                    <button className="p-2 hover:bg-white/10 rounded-lg transition" title="Paramètres">
+                      <Settings className="w-4 h-4 text-gray-400 hover:text-white" />
+                    </button>
+                  </Link>
+                </div>
+              </SignedIn>
+            </>
+          )}
         </div>
       </aside>
 
@@ -107,16 +137,20 @@ export default function Sidebar({ children }: SidebarProps) {
             <h1 className="text-lg font-bold gradient-text">MoneyFlow</h1>
           </div>
           <div className="flex items-center gap-2">
-            <SignedIn>
-              <UserButton afterSignOutUrl="/" />
-            </SignedIn>
-            <SignedOut>
-              <SignInButton mode="modal">
-                <button className="px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700 rounded-lg transition shadow-lg">
-                  Connexion
-                </button>
-              </SignInButton>
-            </SignedOut>
+            {mounted && (
+              <>
+                <SignedIn>
+                  <UserButton />
+                </SignedIn>
+                <SignedOut>
+                  <SignInButton mode="modal">
+                    <button className="px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700 rounded-lg transition shadow-lg">
+                      Connexion
+                    </button>
+                  </SignInButton>
+                </SignedOut>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -124,7 +158,7 @@ export default function Sidebar({ children }: SidebarProps) {
       {/* Bottom Navigation Mobile */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 glass border-t border-white/10 backdrop-blur-xl">
         <div className="flex items-center justify-around px-4 py-3">
-          {navItems.map((item) => {
+          {filteredNavItems.map((item) => {
             const Icon = item.icon
             const isActive = pathname === item.href
             

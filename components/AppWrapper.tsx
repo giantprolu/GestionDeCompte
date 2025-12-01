@@ -1,59 +1,40 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, createContext, useContext, ReactNode } from 'react'
 import { useUser } from '@clerk/nextjs'
+import { useRouter, usePathname } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import UserTypeModal from './UserTypeModal'
 
 type UserType = 'viewer' | 'user' | null
 
-export default function InitializeUserAccounts() {
+interface UserSettingsContextType {
+  userType: UserType
+  setUserType: (type: UserType) => void
+  isLoading: boolean
+}
+
+const UserSettingsContext = createContext<UserSettingsContextType>({
+  userType: null,
+  setUserType: () => {},
+  isLoading: true
+})
+
+export const useUserSettings = () => useContext(UserSettingsContext)
+
+interface Props {
+  children: ReactNode
+}
+
+export default function AppWrapper({ children }: Props) {
   const { user, isLoaded } = useUser()
+  const router = useRouter()
+  const pathname = usePathname()
   const [status, setStatus] = useState<'idle' | 'loading' | 'checking-type' | 'done' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
   const [showUserTypeModal, setShowUserTypeModal] = useState(false)
   const [userType, setUserType] = useState<UserType>(null)
-
-  useEffect(() => {
-    if (!isLoaded || !user || status !== 'idle') return
-
-    const initializeUser = async () => {
-      setStatus('loading')
-      try {
-        // 1. Vérifier les paramètres utilisateur (user_type)
-        const settingsRes = await fetch('/api/user-settings')
-        if (settingsRes.ok) {
-          const settings = await settingsRes.json()
-          
-          // Si user_type n'est pas défini, afficher le modal
-          if (!settings.user_type) {
-            setStatus('checking-type')
-            setShowUserTypeModal(true)
-            return
-          }
-          
-          setUserType(settings.user_type)
-          
-          // Si c'est un visionneur, pas besoin d'initialiser de comptes
-          if (settings.user_type === 'viewer') {
-            setStatus('done')
-            return
-          }
-        }
-
-        // 2. Pour les utilisateurs complets, initialiser les comptes si nécessaire
-        await initializeAccounts()
-        
-        setStatus('done')
-      } catch (error) {
-        console.error('❌ Erreur lors de l\'initialisation:', error)
-        setError(error instanceof Error ? error.message : 'Erreur inconnue')
-        setStatus('error')
-      }
-    }
-
-    initializeUser()
-  }, [user, isLoaded, status])
+  const [isLoadingSettings, setIsLoadingSettings] = useState(true)
 
   const initializeAccounts = async () => {
     const response = await fetch('/api/accounts')
@@ -65,7 +46,6 @@ export default function InitializeUserAccounts() {
     const accounts = await response.json()
 
     if (accounts.length === 0) {
-      
       const boursoRes = await fetch('/api/accounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -113,13 +93,63 @@ export default function InitializeUserAccounts() {
     }
   }
 
+  useEffect(() => {
+    if (!isLoaded || !user || status !== 'idle') return
+
+    const initializeUser = async () => {
+      setStatus('loading')
+      try {
+        // 1. Vérifier les paramètres utilisateur (user_type)
+        const settingsRes = await fetch('/api/user-settings')
+        if (settingsRes.ok) {
+          const settings = await settingsRes.json()
+          
+          // Si user_type n'est pas défini, afficher le modal
+          if (!settings.user_type) {
+            setStatus('checking-type')
+            setShowUserTypeModal(true)
+            setIsLoadingSettings(false)
+            return
+          }
+          
+          setUserType(settings.user_type)
+          
+          // Si c'est un visionneur, pas besoin d'initialiser de comptes
+          if (settings.user_type === 'viewer') {
+            setStatus('done')
+            setIsLoadingSettings(false)
+            // Rediriger vers /partage si pas déjà sur une page partage
+            if (!pathname.startsWith('/partage')) {
+              router.push('/partage')
+            }
+            return
+          }
+        }
+
+        // 2. Pour les utilisateurs complets, initialiser les comptes si nécessaire
+        await initializeAccounts()
+        
+        setStatus('done')
+        setIsLoadingSettings(false)
+      } catch (error) {
+        console.error('❌ Erreur lors de l\'initialisation:', error)
+        setError(error instanceof Error ? error.message : 'Erreur inconnue')
+        setStatus('error')
+        setIsLoadingSettings(false)
+      }
+    }
+
+    initializeUser()
+  }, [user, isLoaded, status, pathname, router])
+
   const handleUserTypeSelect = async (type: 'viewer' | 'user') => {
     setUserType(type)
     setShowUserTypeModal(false)
     
     if (type === 'viewer') {
-      // Visionneur - pas de comptes à créer
+      // Visionneur - pas de comptes à créer, rediriger vers /partage
       setStatus('done')
+      router.push('/partage')
     } else {
       // Utilisateur complet - initialiser les comptes
       setStatus('loading')
@@ -154,7 +184,7 @@ export default function InitializeUserAccounts() {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg p-6 max-w-md">
-          <h3 className="text-lg font-semibold text-red-600 mb-2">Erreur d'initialisation</h3>
+          <h3 className="text-lg font-semibold text-red-600 mb-2">Erreur d&apos;initialisation</h3>
           <p className="text-sm text-slate-600 mb-4">{error}</p>
           <button 
             onClick={() => window.location.reload()}
@@ -167,5 +197,9 @@ export default function InitializeUserAccounts() {
     )
   }
 
-  return null
+  return (
+    <UserSettingsContext.Provider value={{ userType, setUserType, isLoading: isLoadingSettings }}>
+      {children}
+    </UserSettingsContext.Provider>
+  )
 }

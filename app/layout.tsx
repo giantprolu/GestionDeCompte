@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar" ;
-import InitializeUserAccounts from "@/components/InitializeUserAccounts";
+import AuthGuard from "@/components/AuthGuard";
 import { ClerkProvider } from "@clerk/nextjs";
 import { frFR } from "@clerk/localizations";
+import AppWrapper from "@/components/AppWrapper";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,10 +33,13 @@ export default function RootLayout({
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased bg-slate-50`}
         >
-          <InitializeUserAccounts />
-          <Sidebar>
-            {children}
-          </Sidebar>
+          <AuthGuard>
+            <AppWrapper>
+              <Sidebar>
+                {children}
+              </Sidebar>
+            </AppWrapper>
+          </AuthGuard>
         </body>
       </html>
     </ClerkProvider>

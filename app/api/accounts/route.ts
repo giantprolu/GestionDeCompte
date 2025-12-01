@@ -139,3 +139,58 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'Erreur lors de la mise à jour du compte' }, { status: 500 })
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const { userId } = await auth()
+    if (!userId) {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const accountId = searchParams.get('id')
+
+    if (!accountId) {
+      return NextResponse.json({ error: 'ID du compte requis' }, { status: 400 })
+    }
+
+    // Vérifier que le compte appartient à l'utilisateur
+    const { data: account, error: fetchError } = await supabase
+      .from('accounts')
+      .select('id')
+      .eq('id', accountId)
+      .eq('user_id', userId)
+      .single()
+
+    if (fetchError || !account) {
+      return NextResponse.json({ error: 'Compte non trouvé ou non autorisé' }, { status: 404 })
+    }
+
+    // Supprimer d'abord les transactions associées
+    const { error: txnError } = await supabase
+      .from('transactions')
+      .delete()
+      .eq('account_id', accountId)
+
+    if (txnError) {
+      console.error('Error deleting transactions:', txnError)
+    }
+
+    // Supprimer le compte
+    const { error } = await supabase
+      .from('accounts')
+      .delete()
+      .eq('id', accountId)
+      .eq('user_id', userId)
+
+    if (error) {
+      console.error('Delete error:', error)
+      throw error
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Error:', error)
+    return NextResponse.json({ error: 'Erreur lors de la suppression du compte' }, { status: 500 })
+  }
+}

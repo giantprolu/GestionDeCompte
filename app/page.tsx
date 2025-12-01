@@ -1,18 +1,18 @@
 "use client"
 
-// ...existing code...
-
-// ...existing code...
-
 import { useEffect, useState } from 'react'
+import { useUser } from '@clerk/nextjs'
+import { useRouter } from 'next/navigation'
 import { getBaseInitial, sumBalances } from '@/lib/balances'
 import { getMonthClosure } from '@/lib/utils'
+import { useSelectedMonth, getCurrentMonth } from '@/lib/useSelectedMonth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-import { Wallet, TrendingDown, TrendingUp, Calendar, ArrowUpCircle, ArrowDownCircle } from 'lucide-react'
+import { Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import { Wallet, TrendingUp, Calendar, ArrowUpCircle, ArrowDownCircle } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { useUserSettings } from '@/components/AppWrapper'
 
 interface Account {
   id: string
@@ -45,9 +45,19 @@ interface Transaction {
 }
 
 export default function Home() {
+  const { isSignedIn, isLoaded } = useUser()
+  const router = useRouter()
+  const { userType, isLoading: isLoadingSettings } = useUserSettings()
   const [accounts, setAccounts] = useState<Account[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Rediriger les visionneurs vers la page partage
+  useEffect(() => {
+    if (!isLoadingSettings && userType === 'viewer') {
+      router.replace('/partage')
+    }
+  }, [userType, isLoadingSettings, router])
 
   // Générer la liste des mois disponibles à partir des transactions
   const allMonths = Array.from(new Set(transactions.map(txn => {
@@ -55,33 +65,58 @@ export default function Home() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
   }))).sort().reverse()
 
-  const [selectedMonth, setSelectedMonth] = useState(() => {
-    const now = new Date()
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  })
+  // Utiliser le hook partagé pour le mois sélectionné
+  const { selectedMonth, toggleMonth, isCurrentMonth } = useSelectedMonth()
 
   // Filtrer les transactions selon la période de clôture du mois sélectionné
   const [monthClosure, setMonthClosureState] = useState<{ start_date: string, end_date: string } | null>(null)
 
+  // Mois courant
+  const currentMonth = getCurrentMonth()
+
   useEffect(() => {
     async function fetchClosure() {
-      // Récupérer l'utilisateur courant (à adapter selon votre auth)
+      // Récupérer l'utilisateur courant
       const userId = accounts.find(acc => acc.ownerUserId)?.ownerUserId
       if (!userId) return
-      const closure = await getMonthClosure(userId, selectedMonth)
-      setMonthClosureState(closure)
+      
+      // Ne chercher la clôture que pour les mois passés
+      if (selectedMonth !== currentMonth) {
+        const closure = await getMonthClosure(userId, selectedMonth)
+        setMonthClosureState(closure)
+      } else {
+        setMonthClosureState(null)
+      }
     }
     fetchClosure()
-  }, [selectedMonth, accounts])
+  }, [selectedMonth, accounts, currentMonth])
 
-  const monthTransactions = monthClosure
-    ? transactions.filter(txn => txn.date >= monthClosure.start_date && txn.date <= monthClosure.end_date && !txn.archived)
-    : []
+  // Filtrer les transactions selon le mois sélectionné
+  const monthTransactions = (() => {
+    // Pour le mois courant : toutes les transactions NON archivées
+    if (selectedMonth === currentMonth) {
+      return transactions.filter(txn => !txn.archived)
+    }
+    
+    // Pour les mois passés avec une période de clôture
+    if (monthClosure) {
+      return transactions.filter(txn => 
+        txn.date >= monthClosure.start_date && 
+        txn.date <= monthClosure.end_date &&
+        txn.archived === true
+      )
+    }
+    
+    // Fallback : transactions archivées du mois sélectionné
+    return transactions.filter(txn => {
+      const txnMonth = txn.date ? txn.date.substring(0, 7) : ''
+      return txnMonth === selectedMonth && txn.archived === true
+    })
+  })()
 
   // Reset des indicateurs selon le mois sélectionné
   const totalMonthIncome = monthTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0)
   const totalMonthExpenses = monthTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0)
-  const monthBalance = totalMonthIncome - totalMonthExpenses
   const expensesByCategory = monthTransactions.filter(t => t.type === 'expense').reduce((acc: Record<string, { amount: number, category: Category }>, txn) => {
     if (!acc[txn.categoryId]) {
       acc[txn.categoryId] = { amount: 0, category: txn.category }
@@ -98,9 +133,12 @@ export default function Home() {
   const recentTransactions = [...monthTransactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5)
 
   useEffect(() => {
-    fetchData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    if (isLoaded && isSignedIn) {
+      fetchData()
+    } else if (isLoaded && !isSignedIn) {
+      setLoading(false)
+    }
+  }, [isLoaded, isSignedIn])
 
   const fetchData = async () => {
     try {
@@ -108,10 +146,17 @@ export default function Home() {
         fetch('/api/accounts'),
         fetch('/api/expenses'),
       ])
+      
+      if (!accountsRes.ok || !transactionsRes.ok) {
+        console.error('Erreur API:', accountsRes.status, transactionsRes.status)
+        setLoading(false)
+        return
+      }
+      
       const accountsData = await accountsRes.json()
       const transactionsData = await transactionsRes.json()
-      setAccounts(accountsData)
-      setTransactions(transactionsData)
+      setAccounts(Array.isArray(accountsData) ? accountsData : [])
+      setTransactions(Array.isArray(transactionsData) ? transactionsData : [])
     } catch (error) {
       console.error('Erreur lors du chargement des données:', error)
     } finally {
@@ -126,11 +171,6 @@ export default function Home() {
   }
 
   // Calculer le solde courant d'un compte en appliquant ses transactions
-  
-
-  // Calcul des transactions du mois en cours
-  const now = new Date()
-  // ...existing code...
 
   const boursoAccount = accounts.find(acc => acc.type === 'ponctuel' && acc.isOwner !== false)
   const caisseAccount = accounts.find(acc => acc.type === 'obligatoire' && acc.isOwner !== false)
@@ -162,25 +202,74 @@ export default function Home() {
 
   return (
     <div className="space-y-6 md:space-y-8 pb-20 md:pb-8">
-      {/* Onglets de sélection de mois */}
-      <div className="mb-4">
-        <div className="flex gap-2 overflow-x-auto">
-          {allMonths.map(month => (
-            <Button
-              key={month}
-              variant={month === selectedMonth ? 'default' : 'outline'}
-              className={month === selectedMonth ? 'font-bold bg-blue-600 text-white' : ''}
-              onClick={() => setSelectedMonth(month)}
-            >
-              {new Date(month + '-01').toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}
-            </Button>
-          ))}
+      {/* Sélecteur de période modernisé */}
+      <motion.div 
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative"
+      >
+        <div className="flex items-center gap-3 mb-3">
+          <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/30">
+            <Calendar className="w-4 h-4 text-blue-400" />
+          </div>
+          <span className="text-sm font-medium text-slate-300">Période</span>
         </div>
-      </div>
+        
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent">
+          {allMonths.map((month, idx) => {
+            const isSelected = month === selectedMonth
+            const isCurrent = month === currentMonth
+            const monthDate = new Date(month + '-01')
+            const monthName = monthDate.toLocaleString('fr-FR', { month: 'short' })
+            const year = monthDate.getFullYear()
+            
+            return (
+              <motion.button
+                key={month}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: idx * 0.03 }}
+                onClick={() => toggleMonth(month)}
+                className={`relative flex flex-col items-center min-w-[70px] px-4 py-2.5 rounded-xl transition-all duration-200 ${
+                  isSelected 
+                    ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-500/25 scale-105' 
+                    : 'bg-slate-800/60 hover:bg-slate-700/80 text-slate-300 hover:text-white border border-slate-700/50 hover:border-slate-600'
+                }`}
+              >
+                {isCurrent && (
+                  <span className={`absolute -top-1.5 -right-1.5 w-2.5 h-2.5 rounded-full ${
+                    isSelected ? 'bg-green-400' : 'bg-green-500'
+                  } ring-2 ring-slate-900`} />
+                )}
+                <span className="text-xs font-medium uppercase tracking-wide opacity-70">
+                  {year}
+                </span>
+                <span className="text-sm font-bold capitalize">
+                  {monthName}
+                </span>
+              </motion.button>
+            )
+          })}
+        </div>
+        
+        {!isCurrentMonth && (
+          <motion.div
+            initial={{ opacity: 0, y: -5 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-3 flex items-center gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg"
+          >
+            <Calendar className="w-4 h-4 text-amber-400 flex-shrink-0" />
+            <p className="text-xs text-amber-300">
+              Données archivées de <span className="font-semibold">{new Date(selectedMonth + '-01').toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}</span>
+              <span className="text-amber-400/70 ml-1">• Cliquez à nouveau pour revenir au mois actuel</span>
+            </p>
+          </motion.div>
+        )}
+      </motion.div>
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div>
           <h1 className="text-3xl md:text-4xl font-bold text-white drop-shadow-lg">Tableau de bord</h1>
-          <p className="text-slate-200 mt-2 text-base md:text-lg font-medium">Vue d'ensemble de vos finances</p>
+          <p className="text-slate-200 mt-2 text-base md:text-lg font-medium">Vue d&apos;ensemble de vos finances</p>
         </div>
         <div className="flex flex-col gap-2 md:flex-row md:items-center">
           <Button

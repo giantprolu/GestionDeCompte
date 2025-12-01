@@ -1,13 +1,23 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getBaseInitial, getCurrentBalance as getCurrentBalanceUtil } from '@/lib/balances'
+import { useUser } from '@clerk/nextjs'
+import { useRouter } from 'next/navigation'
+import { getBaseInitial } from '@/lib/balances'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Settings, Save, Pencil, X, Share2 } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Settings, Save, Pencil, X, Share2, Plus, Trash2 } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { useUserSettings } from '@/components/AppWrapper'
 
 interface Account {
   id: string
@@ -20,30 +30,44 @@ interface Account {
   shareId?: string
   ownerUserId?: string
 }
-interface Transaction {
-  id: string;
-  amount: number;
-  type: 'income' | 'expense';
-  accountId: string;
-}
 
 export default function ComptesPage() {
+  const { isSignedIn, isLoaded } = useUser()
+  const router = useRouter()
+  const { userType, isLoading: isLoadingSettings } = useUserSettings()
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
   const [balances, setBalances] = useState<Record<string, number>>({})
   const [editingId, setEditingId] = useState<string | null>(null)
-    const [transactions, setTransactions] = useState<Transaction[]>([])
+  
+  // Rediriger les visionneurs vers la page partage
+  useEffect(() => {
+    if (!isLoadingSettings && userType === 'viewer') {
+      router.replace('/partage')
+    }
+  }, [userType, isLoadingSettings, router])
+  
+  // États pour le formulaire d'ajout
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [newAccountName, setNewAccountName] = useState('')
+  const [newAccountType, setNewAccountType] = useState<'ponctuel' | 'obligatoire'>('ponctuel')
+  const [newAccountBalance, setNewAccountBalance] = useState(0)
+  const [isCreating, setIsCreating] = useState(false)
 
   useEffect(() => {
-    fetchAccounts()
-      fetchTransactions()
-  }, [])
+    if (isLoaded && isSignedIn) {
+      fetchAccounts()
+    } else if (isLoaded && !isSignedIn) {
+      setLoading(false)
+    }
+  }, [isLoaded, isSignedIn])
 
   const fetchAccounts = async () => {
     try {
       const response = await fetch('/api/accounts')
+      if (!response.ok) return
       const data = await response.json()
-      setAccounts(data)
+      setAccounts(Array.isArray(data) ? data : [])
       
       // Initialiser les balances
       const initialBalances: Record<string, number> = {}
@@ -57,16 +81,6 @@ export default function ComptesPage() {
       setLoading(false)
     }
   }
-
-    const fetchTransactions = async () => {
-      try {
-        const response = await fetch('/api/transactions')
-        const data = await response.json()
-        setTransactions(data)
-      } catch (error) {
-        console.error('Erreur lors du chargement des transactions:', error)
-      }
-    }
 
     // Calculer le solde courant pour chaque compte (utilise l'utilitaire centralisé)
     const getCurrentBalance = (accountId: string) => {
@@ -89,11 +103,68 @@ export default function ComptesPage() {
       if (response.ok) {
         fetchAccounts()
         setEditingId(null)
-        alert('Solde mis à jour avec succès !')
       }
     } catch (error) {
       console.error('Erreur lors de la mise à jour:', error)
       alert('Erreur lors de la mise à jour')
+    }
+  }
+
+  const handleCreateAccount = async () => {
+    if (!newAccountName.trim()) {
+      alert('Veuillez entrer un nom de compte')
+      return
+    }
+    
+    setIsCreating(true)
+    try {
+      const response = await fetch('/api/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newAccountName.trim(),
+          type: newAccountType,
+          initialBalance: newAccountBalance,
+        }),
+      })
+
+      if (response.ok) {
+        setNewAccountName('')
+        setNewAccountType('ponctuel')
+        setNewAccountBalance(0)
+        setShowAddForm(false)
+        fetchAccounts()
+      } else {
+        const error = await response.json()
+        alert('Erreur: ' + (error.error || 'Impossible de créer le compte'))
+      }
+    } catch (error) {
+      console.error('Erreur lors de la création:', error)
+      alert('Erreur lors de la création du compte')
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
+  const handleDeleteAccount = async (accountId: string, accountName: string) => {
+    if (!confirm(`Êtes-vous sûr de vouloir supprimer le compte "${accountName}" ? Toutes les transactions associées seront également supprimées.`)) {
+      return
+    }
+    
+    try {
+      const response = await fetch(`/api/accounts?id=${accountId}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        fetchAccounts()
+      } else {
+        const error = await response.json()
+        alert('Erreur: ' + (error.error || 'Impossible de supprimer le compte'))
+      }
+    } catch (error) {
+      console.error('Erreur lors de la suppression:', error)
+      alert('Erreur lors de la suppression du compte')
     }
   }
 
@@ -131,18 +202,106 @@ export default function ComptesPage() {
 
   return (
     <div className="space-y-6 md:space-y-8 pb-20 md:pb-8">
-      <div>
-        <h1 className="text-3xl md:text-4xl font-bold text-white drop-shadow-lg">Comptes</h1>
-        <p className="text-slate-200 mt-2 text-base md:text-lg font-medium">Gérez vos soldes initiaux</p>
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+        <div>
+          <h1 className="text-3xl md:text-4xl font-bold text-white drop-shadow-lg">Comptes</h1>
+          <p className="text-slate-200 mt-2 text-base md:text-lg font-medium">Gérez vos comptes et soldes</p>
+        </div>
+        <Button 
+          onClick={() => setShowAddForm(!showAddForm)}
+          className={`w-full md:w-auto font-semibold shadow-lg hover:shadow-xl transition-all duration-200 px-6 py-6 text-base ${
+            showAddForm 
+              ? 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700' 
+              : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700'
+          }`}
+        >
+          {showAddForm ? <X className="w-5 h-5 mr-2" /> : <Plus className="w-5 h-5 mr-2" />}
+          {showAddForm ? 'Annuler' : 'Ajouter un compte'}
+        </Button>
       </div>
 
+      {/* Formulaire d'ajout de compte */}
+      {showAddForm && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+        >
+          <Card className="border-2 border-green-400/30 bg-gradient-to-br from-slate-800/95 to-slate-900/95 shadow-xl">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <Plus className="w-5 h-5 text-green-400" />
+                Nouveau compte
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-slate-200">Nom du compte</Label>
+                  <Input
+                    value={newAccountName}
+                    onChange={(e) => setNewAccountName(e.target.value)}
+                    placeholder="Ex: Compte courant, Livret A..."
+                    className="bg-slate-700/50 border-slate-600/50 text-white placeholder:text-slate-400"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-slate-200">Type de compte</Label>
+                  <Select value={newAccountType} onValueChange={(v) => setNewAccountType(v as 'ponctuel' | 'obligatoire')}>
+                    <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ponctuel">Occasionnel (dépenses variables)</SelectItem>
+                      <SelectItem value="obligatoire">Obligatoire (charges fixes)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-slate-200">Solde initial (€)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={newAccountBalance}
+                    onChange={(e) => setNewAccountBalance(parseFloat(e.target.value) || 0)}
+                    className="bg-slate-700/50 border-slate-600/50 text-white"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowAddForm(false)}
+                  className="bg-slate-700/50 border-slate-600/50 text-white hover:bg-slate-700"
+                >
+                  Annuler
+                </Button>
+                <Button
+                  onClick={handleCreateAccount}
+                  disabled={isCreating || !newAccountName.trim()}
+                  className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
+                >
+                  {isCreating ? 'Création...' : 'Créer le compte'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
       {accounts.length === 0 ? (
-        <Card>
+        <Card className="bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700">
           <CardContent className="py-12 text-center">
-            <p className="text-slate-500 mb-4">Aucun compte configuré</p>
-            <Button onClick={handleCreateDefaultAccounts} className="w-full md:w-auto">
-              Créer les comptes par défaut
-            </Button>
+            <p className="text-slate-400 mb-4">Aucun compte configuré</p>
+            <div className="flex flex-col sm:flex-row gap-2 justify-center">
+              <Button onClick={handleCreateDefaultAccounts} variant="outline" className="bg-slate-700/50 border-slate-600/50 text-white hover:bg-slate-700">
+                Créer les comptes par défaut
+              </Button>
+              <Button onClick={() => setShowAddForm(true)} className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white">
+                <Plus className="w-4 h-4 mr-2" />
+                Créer un compte personnalisé
+              </Button>
+            </div>
           </CardContent>
         </Card>
       ) : (
@@ -171,13 +330,25 @@ export default function ComptesPage() {
                         </span>
                       )}
                     </div>
-                    <span className={`text-sm font-semibold px-3 py-1 rounded-full w-fit ${
-                      account.type === 'ponctuel'
-                        ? 'bg-blue-500/20 text-blue-300 border border-blue-400/30'
-                        : 'bg-green-500/20 text-green-300 border border-green-400/30'
-                    }`}>
-                      {account.type === 'ponctuel' ? 'Occasionnel' : 'Obligatoire'}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-sm font-semibold px-3 py-1 rounded-full w-fit ${
+                        account.type === 'ponctuel'
+                          ? 'bg-blue-500/20 text-blue-300 border border-blue-400/30'
+                          : 'bg-green-500/20 text-green-300 border border-green-400/30'
+                      }`}>
+                        {account.type === 'ponctuel' ? 'Occasionnel' : 'Obligatoire'}
+                      </span>
+                      {account.isOwner && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteAccount(account.id, account.name)}
+                          className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6">
@@ -269,7 +440,7 @@ export default function ComptesPage() {
                 Comment ça fonctionne ?
               </h3>
               <p className="text-sm text-slate-300">
-                Le <strong className="text-blue-300">solde initial</strong> représente l'argent disponible au début.
+                Le <strong className="text-blue-300">solde initial</strong> représente l&apos;argent disponible au début.
                 Le <strong className="text-green-300">solde actuel</strong> est calculé automatiquement en soustrayant
                 toutes vos dépenses du solde initial.
               </p>

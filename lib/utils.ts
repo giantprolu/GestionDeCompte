@@ -1,49 +1,3 @@
-  // import { supabase } from './db' // déjà importé plus bas
-
-    // Récupère la période de clôture pour un mois donné
-    export async function getMonthClosure(userId: string, monthYear: string) {
-      const { data, error } = await supabase
-        .from('month_closures')
-        .select('start_date, end_date')
-        .eq('user_id', userId)
-        .eq('month_year', monthYear)
-        .single()
-      if (error) throw error
-      return data
-    }
-
-    // Enregistre une nouvelle période de clôture pour un mois
-    export async function setMonthClosure(userId: string, monthYear: string, startDate: string, endDate: string) {
-      const { error } = await supabase
-        .from('month_closures')
-        .upsert({ user_id: userId, month_year: monthYear, start_date: startDate, end_date: endDate })
-      if (error) throw error
-    }
-    // Log toutes les transactions pour vérifier le format des dates
-    const { data: allTx, error: allTxError } = await supabase
-      .from('transactions')
-      .select('id, date, archived')
-
-    if (allTxError) {
-      console.error('[archivePreviousMonthTransactions] ALL error:', allTxError)
-    }
-  // Définition des variables de date
-  const now = new Date()
-  const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-  const lastDayPrevMonth = new Date(firstDayOfMonth.getTime() - 1)
-  const firstDayPrevMonth = new Date(lastDayPrevMonth.getFullYear(), lastDayPrevMonth.getMonth(), 1)
-
-  // Logs des dates
-  // Afficher toutes les transactions du mois précédent avant l'update
-  const { data: preview, error: previewError } = await supabase
-    .from('transactions')
-    .select('*')
-    .gte('date', firstDayPrevMonth.toISOString())
-    .lte('date', lastDayPrevMonth.toISOString())
-
-  if (previewError) {
-    console.error('[archivePreviousMonthTransactions] preview error:', previewError)
-  }
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { supabase } from "./db"
@@ -52,55 +6,87 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+// Récupère la période de clôture pour un mois donné
+export async function getMonthClosure(userId: string, monthYear: string) {
+  const { data, error } = await supabase
+    .from('month_closures')
+    .select('start_date, end_date')
+    .eq('user_id', userId)
+    .eq('month_year', monthYear)
+    .single()
+  // PGRST116 = no rows returned, ce n'est pas une erreur
+  if (error && error.code !== 'PGRST116') throw error
+  return data
+}
+
+// Enregistre une nouvelle période de clôture pour un mois
+export async function setMonthClosure(userId: string, monthYear: string, startDate: string, endDate: string) {
+  const { error } = await supabase
+    .from('month_closures')
+    .upsert({ user_id: userId, month_year: monthYear, start_date: startDate, end_date: endDate })
+  if (error) throw error
+}
+
 // Archive les transactions du mois précédent
-export async function archivePreviousMonthTransactions() {
-  const now = new Date()
-  const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-  const lastDayPrevMonth = new Date(firstDayOfMonth.getTime() - 1)
-  const firstDayPrevMonth = new Date(lastDayPrevMonth.getFullYear(), lastDayPrevMonth.getMonth(), 1)
-
-
-  // Archiver toutes les transactions non archivées dont la date est antérieure à aujourd'hui
+export async function archivePreviousMonthTransactions(userId: string) {
   const today = new Date()
   const todayIso = today.toISOString().split('T')[0] // format YYYY-MM-DD
 
-  // Récupérer l'utilisateur courant (à adapter selon votre auth)
-  const userId = (await supabase.auth.getUser()).data?.user?.id
-  if (!userId) throw new Error('Utilisateur non authentifié')
+  // Récupérer les comptes de l'utilisateur
+  const { data: userAccounts, error: accountsError } = await supabase
+    .from('accounts')
+    .select('id')
+    .eq('user_id', userId)
 
-  // Récupérer la dernière transaction à archiver
+  if (accountsError) {
+    throw new Error('Erreur lors de la récupération des comptes')
+  }
+
+  const userAccountIds = userAccounts?.map(a => a.id) || []
+
+  if (userAccountIds.length === 0) {
+    throw new Error('Aucun compte trouvé pour cet utilisateur')
+  }
+
+  // Récupérer les transactions non archivées avant aujourd'hui pour cet utilisateur
   const { data: txsToArchive, error: previewError } = await supabase
     .from('transactions')
-    .select('date')
+    .select('date, account_id')
     .lt('date', todayIso)
     .eq('archived', false)
-    .order('date', { ascending: false })
-    .limit(1)
+    .in('account_id', userAccountIds)
+    .order('date', { ascending: true })
 
   if (previewError) {
     console.error('[archivePreviousMonthTransactions] preview error:', previewError)
+    throw new Error('Erreur lors de la récupération des transactions')
   }
-  const lastDate = txsToArchive?.[0]?.date
-  if (!lastDate) throw new Error('Aucune transaction à archiver')
 
-  // Calculer la période de clôture
-  const d = new Date(lastDate)
+  if (!txsToArchive || txsToArchive.length === 0) {
+    throw new Error('Aucune transaction à archiver')
+  }
+
+  const firstDate = txsToArchive[0].date
+  const lastDate = txsToArchive[txsToArchive.length - 1].date
+
+  // Calculer la période de clôture basée sur la première date
+  const d = new Date(firstDate)
   const monthYear = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-  const startDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
-  const endDate = lastDate
 
   // Enregistrer la période de clôture
-  await setMonthClosure(userId, monthYear, startDate, endDate)
+  await setMonthClosure(userId, monthYear, firstDate, lastDate)
 
-  // Archiver les transactions
+  // Archiver les transactions de cet utilisateur
   const { data, error } = await supabase
     .from('transactions')
     .update({ archived: true })
-    .lte('date', endDate)
+    .lt('date', todayIso)
     .eq('archived', false)
+    .in('account_id', userAccountIds)
 
   if (error) {
-    throw new Error('Erreur lors de l’archivage des transactions : ' + error.message)
+    throw new Error('Erreur lors de l\'archivage des transactions : ' + error.message)
   }
-  return { updated: data, error, closure: { monthYear, startDate, endDate } }
+  
+  return { updated: data, closure: { monthYear, startDate: firstDate, endDate: lastDate } }
 }

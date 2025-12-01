@@ -29,6 +29,13 @@ interface Transaction {
   recurrence_frequency?: string
   recurrence_day?: number
   note?: string
+  archived?: boolean
+}
+
+interface MonthClosure {
+  month_year: string
+  start_date: string
+  end_date: string
 }
 
 interface DashboardData {
@@ -41,6 +48,8 @@ interface DashboardData {
   totalBalance: number
   monthlyIncome: number
   monthlyExpense: number
+  monthClosures: MonthClosure[]
+  currentMonthStart?: string
 }
 
 export async function GET(request: NextRequest) {
@@ -80,6 +89,22 @@ export async function GET(request: NextRequest) {
       if (accountsError) {
         console.error('Erreur comptes:', accountsError)
         continue
+      }
+
+      // Récupérer les clôtures de mois du propriétaire
+      const { data: monthClosures } = await supabase
+        .from('month_closures')
+        .select('month_year, start_date, end_date')
+        .eq('user_id', ownerId)
+        .order('month_year', { ascending: false })
+
+      // Déterminer la date de début du mois actuel (lendemain de la dernière clôture)
+      let currentMonthStart: string | undefined
+      if (monthClosures && monthClosures.length > 0) {
+        const lastClosure = monthClosures[0]
+        const endDate = new Date(lastClosure.end_date)
+        endDate.setDate(endDate.getDate() + 1)
+        currentMonthStart = endDate.toISOString().split('T')[0]
       }
 
       // Récupérer les transactions du propriétaire (uniquement passées ou aujourd'hui)
@@ -183,7 +208,8 @@ export async function GET(request: NextRequest) {
         is_recurring: t.is_recurring || false,
         recurrence_frequency: t.recurrence_frequency,
         recurrence_day: t.recurrence_day,
-        note: t.note
+        note: t.note,
+        archived: t.archived || false
       })) || []
 
       dashboardsByOwner[ownerId] = {
@@ -195,7 +221,9 @@ export async function GET(request: NextRequest) {
         transactions,
         totalBalance,
         monthlyIncome,
-        monthlyExpense
+        monthlyExpense,
+        monthClosures: monthClosures || [],
+        currentMonthStart
       }
     }
 

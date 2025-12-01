@@ -1,12 +1,15 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useUser } from '@clerk/nextjs'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Plus, Filter, Trash2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import ExpenseForm from '@/components/ExpenseForm'
 import ExpenseFilters from '@/components/ExpenseFilters'
+import { useUserSettings } from '@/components/AppWrapper'
 
 interface Account {
   id: string
@@ -25,6 +28,9 @@ interface Expense {
 }
 
 export default function DepensesPage() {
+  const { isSignedIn, isLoaded } = useUser()
+  const router = useRouter()
+  const { userType, isLoading: isLoadingSettings } = useUserSettings()
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
@@ -37,9 +43,20 @@ export default function DepensesPage() {
     endDate: '',
   })
 
+  // Rediriger les visionneurs vers la page partage
   useEffect(() => {
-    fetchData()
-  }, [])
+    if (!isLoadingSettings && userType === 'viewer') {
+      router.replace('/partage')
+    }
+  }, [userType, isLoadingSettings, router])
+
+  useEffect(() => {
+    if (isLoaded && isSignedIn) {
+      fetchData()
+    } else if (isLoaded && !isSignedIn) {
+      setLoading(false)
+    }
+  }, [isLoaded, isSignedIn])
 
   const fetchData = async () => {
     try {
@@ -48,11 +65,13 @@ export default function DepensesPage() {
         fetch('/api/accounts'),
       ])
       
+      if (!expensesRes.ok || !accountsRes.ok) return
+      
       const expensesData = await expensesRes.json()
       const accountsData = await accountsRes.json()
       
-      setExpenses(expensesData)
-      setAccounts(accountsData)
+      setExpenses(Array.isArray(expensesData) ? expensesData : [])
+      setAccounts(Array.isArray(accountsData) ? accountsData : [])
     } catch (error) {
       console.error('Erreur lors du chargement des données:', error)
     } finally {

@@ -22,6 +22,20 @@ const FIXED_KEYWORDS = [
   'logement', 'loyer', 'assurance', 'assurances', 'abonnement', 'facture', 'impot', 'impôts', 'impots', 'crédit', 'credit', 'remboursement', 'épargne', 'epargne'
 ]
 
+// Helper pour obtenir le mois précédent au format YYYY-MM
+function getPreviousMonth(monthYear: string): string {
+  const [year, month] = monthYear.split('-').map(Number)
+  const prevDate = new Date(year, month - 2, 1)
+  return `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`
+}
+
+// Helper pour ajouter un jour à une date ISO
+function addOneDay(dateStr: string): string {
+  const d = new Date(dateStr)
+  d.setDate(d.getDate() + 1)
+  return d.toISOString().split('T')[0]
+}
+
 export async function POST(request: Request) {
   try {
     const { userId } = await auth()
@@ -29,6 +43,7 @@ export async function POST(request: Request) {
 
     const body = await request.json().catch(() => ({}))
     const monthsWindow = Number(body.monthsWindow) || 3
+    const selectedMonth = body.selectedMonth // Format: YYYY-MM
     const savingsRate = Number(body.savingsRate ?? 0.1)
     const ratioMin = Number(body.ratioMin ?? 0.6)
     const perCategoryMin = Number(body.perCategoryMin ?? 10)
@@ -46,16 +61,77 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Aucun compte trouvé' }, { status: 400 })
     }
 
-    // period
-    const end = new Date()
-    const start = new Date(end.getFullYear(), end.getMonth() - monthsWindow + 1, 1)
+    // Déterminer la période en utilisant les clôtures de mois
+    let startDate: string | null = null
+    let endDate: string | null = null
+    let useNonArchived = false
 
-    // fetch transactions for accounts in window
-    const { data: txs, error } = await supabase
-      .from('transactions')
-      .select('amount,date,type,category:categories(name)')
-      .in('account_id', accountIds)
-      .gte('date', start.toISOString())
+    if (selectedMonth) {
+      // Récupérer la clôture du mois sélectionné
+      const { data: closure } = await supabase
+        .from('month_closures')
+        .select('start_date, end_date')
+        .eq('user_id', userId)
+        .eq('month_year', selectedMonth)
+        .single()
+
+      if (closure) {
+        // Mois clôturé - utiliser ses dates
+        startDate = closure.start_date
+        endDate = closure.end_date
+      } else {
+        // Mois pas encore clôturé (mois en cours)
+        // Chercher la clôture du mois précédent pour avoir la date de début
+        const prevMonth = getPreviousMonth(selectedMonth)
+        const { data: prevClosure } = await supabase
+          .from('month_closures')
+          .select('end_date')
+          .eq('user_id', userId)
+          .eq('month_year', prevMonth)
+          .single()
+
+        if (prevClosure) {
+          // Le mois actuel commence le lendemain de la fin du mois précédent
+          startDate = addOneDay(prevClosure.end_date)
+          useNonArchived = true
+        } else {
+          // Aucune clôture trouvée - utiliser toutes les transactions non archivées
+          useNonArchived = true
+        }
+      }
+    } else {
+      // Pas de mois sélectionné - utiliser les transactions non archivées
+      useNonArchived = true
+    }
+
+    // fetch transactions
+    let txs
+    let error
+    
+    if (useNonArchived) {
+      let query = supabase
+        .from('transactions')
+        .select('amount,date,type,category:categories(name)')
+        .in('account_id', accountIds)
+        .neq('archived', true)
+      
+      if (startDate) {
+        query = query.gte('date', startDate)
+      }
+      
+      const result = await query
+      txs = result.data
+      error = result.error
+    } else {
+      const result = await supabase
+        .from('transactions')
+        .select('amount,date,type,category:categories(name)')
+        .in('account_id', accountIds)
+        .gte('date', startDate!)
+        .lte('date', endDate!)
+      txs = result.data
+      error = result.error
+    }
 
     if (error) {
       throw error

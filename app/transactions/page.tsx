@@ -1,15 +1,19 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import { useUser } from '@clerk/nextjs'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Plus, Filter, Trash2, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react'
+import { useSelectedMonth, getCurrentMonth } from '@/lib/useSelectedMonth'
 import { getMonthClosure } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import TransactionForm from '@/components/TransactionForm'
 import RecurringTransactionForm from '@/components/RecurringTransactionForm'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Calendar, Wallet } from "lucide-react";
+import { useUserSettings } from '@/components/AppWrapper'
 
 interface Account {
   id: string
@@ -42,15 +46,18 @@ interface Transaction {
 }
 
 export default function TransactionsPage() {
+  const { isSignedIn, isLoaded } = useUser()
+  const router = useRouter()
+  const { userType, isLoading: isLoadingSettings } = useUserSettings()
   const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const { selectedMonth, isCurrentMonth } = useSelectedMonth()
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [formType, setFormType] = useState<'ponctuel' | 'recurrent'>('ponctuel')
   const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all')
   const [showUpcoming, setShowUpcoming] = useState(false)
-  const [showOnlyCurrentMonth, setShowOnlyCurrentMonth] = useState(true)
+  const [showAllMonths, setShowAllMonths] = useState(false)
   const [search, setSearch] = useState('')
   const [searchDate, setSearchDate] = useState('')
   const [searchAmount, setSearchAmount] = useState('')
@@ -58,17 +65,20 @@ export default function TransactionsPage() {
   const [searchAccount, setSearchAccount] = useState('')
   const [searchNote, setSearchNote] = useState('')
 
+  // Rediriger les visionneurs vers la page partage
   useEffect(() => {
-    fetchData()
-  }, [])
+    if (!isLoadingSettings && userType === 'viewer') {
+      router.replace('/partage')
+    }
+  }, [userType, isLoadingSettings, router])
 
-  // Met à jour le mois sélectionné au chargement des transactions
   useEffect(() => {
-    if (transactions.length === 0) return;
-    const latest = transactions.reduce((max, txn) => new Date(txn.date) > new Date(max.date) ? txn : max, transactions[0]);
-    const d = new Date(latest.date);
-    setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
-  }, [transactions]);
+    if (isLoaded && isSignedIn) {
+      fetchData()
+    } else if (isLoaded && !isSignedIn) {
+      setLoading(false)
+    }
+  }, [isLoaded, isSignedIn])
 
   // Vérifie périodiquement si le mois a changé et recharge les données si nécessaire
   const currentMonthRef = useRef(`${new Date().getMonth()}-${new Date().getFullYear()}`)
@@ -77,8 +87,6 @@ export default function TransactionsPage() {
       const key = `${new Date().getMonth()}-${new Date().getFullYear()}`
       if (key !== currentMonthRef.current) {
         currentMonthRef.current = key
-        // Remettre l'affichage sur le mois courant et recharger
-        setShowOnlyCurrentMonth(true)
         fetchData()
       }
     }, 60_000) // vérifie chaque minute
@@ -94,10 +102,15 @@ export default function TransactionsPage() {
         fetch('/api/accounts'),
       ])
       
+      if (!transactionsRes.ok || !accountsRes.ok) {
+        setLoading(false)
+        return
+      }
+      
       const transactionsData = await transactionsRes.json()
       const accountsData = await accountsRes.json()
       
-      setTransactions(transactionsData)
+      setTransactions(Array.isArray(transactionsData) ? transactionsData : [])
       setAccounts(accountsData)
     } catch (error) {
       console.error('Erreur lors du chargement des données:', error)
@@ -106,57 +119,87 @@ export default function TransactionsPage() {
     }
   }
 
-  // Filtrer les transactions côté client, en excluant celles archivées
+  // Filtrer les transactions côté client
   // Filtrage selon la période de clôture du mois sélectionné
   const [monthClosure, setMonthClosureState] = useState<{ start_date: string, end_date: string } | null>(null)
+  const currentMonth = getCurrentMonth()
 
   useEffect(() => {
     async function fetchClosure() {
-      // Récupérer l'utilisateur courant (à adapter selon votre auth)
       const userId = accounts.find(acc => acc.ownerUserId)?.ownerUserId
       if (!userId) return
-      const closure = await getMonthClosure(userId, selectedMonth)
-      setMonthClosureState(closure)
+      
+      // Ne chercher la clôture que pour les mois passés
+      if (selectedMonth !== currentMonth) {
+        const closure = await getMonthClosure(userId, selectedMonth)
+        setMonthClosureState(closure)
+      } else {
+        setMonthClosureState(null)
+      }
     }
     fetchClosure()
-  }, [selectedMonth, accounts])
+  }, [selectedMonth, accounts, currentMonth])
 
-  const filteredTransactions = monthClosure
-    ? transactions.filter(txn => {
-        if (txn.archived) return false;
-        if (txn.date < monthClosure.start_date || txn.date > monthClosure.end_date) return false;
-        if (typeFilter !== 'all' && txn.type !== typeFilter) return false;
-        if (search.trim() !== '') {
-          const lower = search.trim().toLowerCase();
-          const fields = [
-            txn.category?.name,
-            txn.category?.icon,
-            txn.account?.name,
-            txn.note,
-            txn.amount?.toString(),
-            txn.date
-          ].map(v => (v || '').toString().toLowerCase());
-          if (!fields.some(f => f.includes(lower))) return false;
-        }
-        if (searchDate.trim() !== '') {
-          const dateStr = new Date(txn.date).toISOString().split('T')[0];
-          if (!dateStr.includes(searchDate.trim())) return false;
-        }
-        if (searchAmount.trim() !== '') {
-          if (!txn.amount.toString().includes(searchAmount.trim())) return false;
-        }
-        if (searchCategory.trim() !== '') {
-          if (!txn.category?.name?.toLowerCase().includes(searchCategory.trim().toLowerCase())) return false;
-        }
-        if (searchAccount.trim() !== '') {
-          if (!txn.account?.name?.toLowerCase().includes(searchAccount.trim().toLowerCase())) return false;
-        }
-        if (searchNote.trim() !== '') {
-          if (!txn.note?.toLowerCase().includes(searchNote.trim().toLowerCase())) return false;
-        }
-        return true;
+  // Filtrer les transactions selon le mois sélectionné et le mode "Tous mois"
+  const filteredTransactions = (() => {
+    let filtered = transactions
+
+    // Si "Tous mois" est actif, montrer toutes les transactions non archivées
+    if (showAllMonths) {
+      filtered = transactions.filter(txn => !txn.archived)
+    } else if (selectedMonth === currentMonth) {
+      // Pour le mois courant : toutes les transactions NON archivées
+      // (on ne filtre plus par date du mois pour éviter les problèmes de format)
+      filtered = transactions.filter(txn => !txn.archived)
+    } else if (monthClosure) {
+      // Pour les mois passés avec une période de clôture
+      filtered = transactions.filter(txn => 
+        txn.date >= monthClosure.start_date && 
+        txn.date <= monthClosure.end_date &&
+        txn.archived === true
+      )
+    } else {
+      // Fallback pour mois passé sans clôture : transactions archivées du mois sélectionné
+      filtered = transactions.filter(txn => {
+        const txnMonth = txn.date ? txn.date.substring(0, 7) : ''
+        return txnMonth === selectedMonth && txn.archived === true
       })
-    : [];
+    }
+
+    // Appliquer les filtres supplémentaires
+    return filtered.filter(txn => {
+      if (typeFilter !== 'all' && txn.type !== typeFilter) return false
+      if (search.trim() !== '') {
+        const lower = search.trim().toLowerCase()
+        const fields = [
+          txn.category?.name,
+          txn.category?.icon,
+          txn.account?.name,
+          txn.note,
+          txn.amount?.toString(),
+          txn.date
+        ].map(v => (v || '').toString().toLowerCase())
+        if (!fields.some(f => f.includes(lower))) return false
+      }
+      if (searchDate.trim() !== '') {
+        const dateStr = new Date(txn.date).toISOString().split('T')[0]
+        if (!dateStr.includes(searchDate.trim())) return false
+      }
+      if (searchAmount.trim() !== '') {
+        if (!txn.amount.toString().includes(searchAmount.trim())) return false
+      }
+      if (searchCategory.trim() !== '') {
+        if (!txn.category?.name?.toLowerCase().includes(searchCategory.trim().toLowerCase())) return false
+      }
+      if (searchAccount.trim() !== '') {
+        if (!txn.account?.name?.toLowerCase().includes(searchAccount.trim().toLowerCase())) return false
+      }
+      if (searchNote.trim() !== '') {
+        if (!txn.note?.toLowerCase().includes(searchNote.trim().toLowerCase())) return false
+      }
+      return true
+    })
+  })()
 
   const handleDeleteTransaction = async (id: string) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cette transaction ?')) return
@@ -200,24 +243,15 @@ export default function TransactionsPage() {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-4 md:space-y-6 pb-20 md:pb-8"
     >
-      {/* Onglets de sélection de mois */}
-      <div className="mb-4">
-        <div className="flex gap-2 overflow-x-auto">
-          {Array.from(new Set(transactions.map(txn => {
-            const d = new Date(txn.date)
-            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-          }))).sort().reverse().map(month => (
-            <Button
-              key={month}
-              variant={month === selectedMonth ? 'default' : 'outline'}
-              className={month === selectedMonth ? 'font-bold bg-blue-600 text-white' : ''}
-              onClick={() => setSelectedMonth(month)}
-            >
-              {new Date(month + '-01').toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}
-            </Button>
-          ))}
+      {/* Indicateur du mois affiché */}
+      {!isCurrentMonth && !showAllMonths && (
+        <div className="bg-amber-500/20 border border-amber-500/50 rounded-lg p-3">
+          <p className="text-sm text-amber-400">
+            📅 Vous visualisez les transactions archivées de {new Date(selectedMonth + '-01').toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}.
+            Changez de mois depuis le Dashboard ou activez &quot;Tous mois&quot;.
+          </p>
         </div>
-      </div>
+      )}
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <h1 className="text-3xl md:text-4xl font-bold text-white drop-shadow-lg">Transactions</h1>
         <Button 
@@ -399,17 +433,17 @@ export default function TransactionsPage() {
                     <span className="hidden xs:inline">{showUpcoming ? 'Masquer futures' : 'Voir futures'}</span>
                   </Button>
                   <Button
-                    variant={showOnlyCurrentMonth ? "default" : "outline"}
+                    variant={showAllMonths ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setShowOnlyCurrentMonth(!showOnlyCurrentMonth)}
+                    onClick={() => setShowAllMonths(!showAllMonths)}
                     className={`flex items-center gap-1 px-2 py-1 text-xs sm:text-sm rounded-lg transition-all duration-200 ${
-                      showOnlyCurrentMonth
-                        ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white'
+                      showAllMonths
+                        ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white'
                         : 'bg-slate-700/50 border-slate-600/50 text-slate-300 hover:bg-slate-700'
                     }`}
                   >
                     <Calendar className="w-4 h-4" />
-                    <span className="hidden xs:inline">{showOnlyCurrentMonth ? 'Mois courant' : 'Tous mois'}</span>
+                    <span className="hidden xs:inline">{showAllMonths ? 'Tous mois' : 'Mois sélectionné'}</span>
                   </Button>
                 </div>
               </div>

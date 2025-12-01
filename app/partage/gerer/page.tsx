@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useUser } from '@clerk/nextjs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +19,7 @@ interface Share {
 }
 
 export default function PartagePage() {
+  const { isSignedIn, isLoaded } = useUser()
   const [shares, setShares] = useState<Share[]>([])
   const [loading, setLoading] = useState(true)
   const [username, setUsername] = useState('')
@@ -26,8 +28,12 @@ export default function PartagePage() {
   const [adding, setAdding] = useState(false)
 
   useEffect(() => {
-    fetchShares()
-  }, [])
+    if (isLoaded && isSignedIn) {
+      fetchShares()
+    } else if (isLoaded && !isSignedIn) {
+      setLoading(false)
+    }
+  }, [isLoaded, isSignedIn])
 
   const fetchShares = async () => {
     try {

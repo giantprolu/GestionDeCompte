@@ -68,6 +68,7 @@ export async function GET(request: Request) {
       recurrenceFrequency: txn.recurrence_frequency,
       recurrenceDay: txn.recurrence_day,
       isActive: txn.is_active,
+      archived: txn.archived || false,
       createdAt: txn.created_at,
       updatedAt: txn.updated_at,
     }))

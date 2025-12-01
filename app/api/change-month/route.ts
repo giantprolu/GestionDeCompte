@@ -1,9 +1,16 @@
 import { NextResponse } from 'next/server'
+import { auth } from '@clerk/nextjs/server'
 import { archivePreviousMonthTransactions } from '@/lib/utils'
 
 export async function POST() {
   try {
-    const result = await archivePreviousMonthTransactions()
+    const { userId } = await auth()
+    
+    if (!userId) {
+      return NextResponse.json({ success: false, error: 'Non authentifié' }, { status: 401 })
+    }
+
+    const result = await archivePreviousMonthTransactions(userId)
     return NextResponse.json({ success: true, debug: result })
   } catch (error) {
     let message = 'Erreur inconnue';
