@@ -140,29 +140,38 @@ export async function POST(request: Request) {
       throw error
     }
 
-    // Mettre à jour le solde initial du compte
-    const montant = parseFloat(body.amount)
-    let updateValue = 0
-    if (body.type === 'income') {
-      updateValue = montant
-    } else if (body.type === 'expense') {
-      updateValue = -montant
-    }
-    if (updateValue !== 0) {
-      // Récupérer le solde actuel
-      const { data: compte } = await supabase
-        .from('accounts')
-        .select('initial_balance')
-        .eq('id', body.accountId)
-        .single()
-      if (compte) {
-        const nouveauSolde = (compte.initial_balance || 0) + updateValue
-        await supabase
+    // Mettre à jour le solde initial du compte SEULEMENT si la transaction n'est pas dans le futur
+    const transactionDate = new Date(body.date)
+    const today = new Date()
+    today.setHours(23, 59, 59, 999) // Fin de la journée
+
+    // Ne mettre à jour le solde que si la date est passée ou aujourd'hui
+    if (transactionDate <= today) {
+      const montant = parseFloat(body.amount)
+      let updateValue = 0
+      if (body.type === 'income') {
+        updateValue = montant
+      } else if (body.type === 'expense') {
+        updateValue = -montant
+      }
+      if (updateValue !== 0) {
+        // Récupérer le solde actuel
+        const { data: compte } = await supabase
           .from('accounts')
-          .update({ initial_balance: nouveauSolde })
+          .select('initial_balance')
           .eq('id', body.accountId)
+          .single()
+        if (compte) {
+          const nouveauSolde = (compte.initial_balance || 0) + updateValue
+          await supabase
+            .from('accounts')
+            .update({ initial_balance: nouveauSolde })
+            .eq('id', body.accountId)
+        }
       }
     }
+    // Note: Les transactions futures seront prises en compte automatiquement
+    // quand leur date arrivera (via le calcul currentBalance dans GET /api/accounts)
 
     // Mapper les champs pour correspondre au front-end
     const mappedTransaction = {

@@ -148,8 +148,8 @@ export default function TransactionsPage() {
     if (showAllMonths) {
       filtered = transactions.filter(txn => !txn.archived)
     } else if (selectedMonth === currentMonth) {
-      // Pour le mois courant : toutes les transactions NON archivées
-      // (on ne filtre plus par date du mois pour éviter les problèmes de format)
+      // Pour le mois courant : transactions NON archivées
+      // Mais on garde les futures pour l'affichage si showUpcoming est actif
       filtered = transactions.filter(txn => !txn.archived)
     } else if (monthClosure) {
       // Pour les mois passés avec une période de clôture
@@ -223,11 +223,17 @@ export default function TransactionsPage() {
     setShowForm(false)
   }
 
-  const totalIncome = filteredTransactions
+  // Date d'aujourd'hui pour filtrer les transactions futures
+  const today = new Date().toISOString().split('T')[0]
+
+  // Calculer les totaux en excluant les transactions futures
+  const transactionsForTotals = filteredTransactions.filter(t => t.date <= today)
+
+  const totalIncome = transactionsForTotals
     .filter(t => t.type === 'income')
     .reduce((sum, t) => sum + t.amount, 0)
 
-  const totalExpense = filteredTransactions
+  const totalExpense = transactionsForTotals
     .filter(t => t.type === 'expense')
     .reduce((sum, t) => sum + t.amount, 0)
 

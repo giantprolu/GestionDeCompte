@@ -93,9 +93,11 @@ export default function Home() {
 
   // Filtrer les transactions selon le mois sélectionné
   const monthTransactions = (() => {
-    // Pour le mois courant : toutes les transactions NON archivées
+    const today = new Date().toISOString().split('T')[0] // Date d'aujourd'hui au format YYYY-MM-DD
+    
+    // Pour le mois courant : transactions NON archivées ET pas dans le futur
     if (selectedMonth === currentMonth) {
-      return transactions.filter(txn => !txn.archived)
+      return transactions.filter(txn => !txn.archived && txn.date <= today)
     }
     
     // Pour les mois passés avec une période de clôture
@@ -171,9 +173,9 @@ export default function Home() {
   }
 
   // Calculer le solde courant d'un compte en appliquant ses transactions
-
-  const boursoAccount = accounts.find(acc => acc.type === 'ponctuel' && acc.isOwner !== false)
-  const caisseAccount = accounts.find(acc => acc.type === 'obligatoire' && acc.isOwner !== false)
+  // Utiliser le nom du compte pour éviter les confusions (Bourso vs Carte Restaurant)
+  const boursoAccount = accounts.find(acc => acc.name.toLowerCase().includes('bourso') && acc.isOwner !== false)
+  const caisseAccount = accounts.find(acc => (acc.name.toLowerCase().includes('caisse') || acc.type === 'obligatoire') && acc.isOwner !== false)
 
   // Calculer le total uniquement des comptes propres (pas les partagés)
   const ownAccounts = accounts.filter(acc => acc.isOwner !== false)
