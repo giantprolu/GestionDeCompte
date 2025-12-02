@@ -2,6 +2,15 @@ import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/db'
 import { auth } from '@clerk/nextjs/server'
 
+// Catégories fixes à exclure du budget variable
+const FIXED_CATEGORIES = ['logement', 'allocation', 'assurances', 'santé', 'abonnements']
+
+// Vérifier si une catégorie est fixe
+const isFixedCategory = (categoryName: string) => {
+  const normalized = categoryName.toLowerCase().trim()
+  return FIXED_CATEGORIES.some(fixed => normalized.includes(fixed))
+}
+
 // Helper pour obtenir le mois précédent au format YYYY-MM
 function getPreviousMonth(monthYear: string): string {
   const [year, month] = monthYear.split('-').map(Number)
@@ -31,7 +40,7 @@ export async function GET(request: Request) {
       .select('id')
       .eq('user_id', userId)
 
-    const accountIds = (accounts || []).map((a: any) => a.id)
+    const accountIds = (accounts || []).map((a: { id: string }) => a.id)
     if (accountIds.length === 0) return NextResponse.json({ error: 'Aucun compte trouvé' }, { status: 400 })
 
     // 2) Déterminer les dates de début/fin en utilisant les clôtures
@@ -113,32 +122,70 @@ export async function GET(request: Request) {
     if (error) throw error
     const transactions = txs || []
 
-    // 4) Agrégation par catégorie - filtrer les dépenses
+    // 4) Agrégation par catégorie - séparer fixes et variables
     const sums: Record<string, number> = {}
+    const fixedSums: Record<string, number> = {}
+    let totalIncome = 0
+    let totalFixedExpenses = 0
+    let totalVariableExpenses = 0
+    
     for (const t of transactions) {
-      const rawCat: any = (t as any).category
+      const txRecord = t as { category?: { name?: string; type?: string } | { name?: string; type?: string }[]; type?: string; amount?: number }
+      const rawCat = txRecord.category
       const catData = Array.isArray(rawCat) ? rawCat[0] : rawCat
       const catType = catData?.type
-      const txType = (t as any).type
+      const txType = txRecord.type
+      const name = catData?.name || 'Non catégorisé'
+      const amt = Number(t.amount || 0)
+      const val = amt < 0 ? Math.abs(amt) : amt
+      
+      // Revenus
+      if (txType === 'income') {
+        totalIncome += val
+        continue
+      }
       
       // Considérer comme dépense si le type de transaction OU le type de catégorie est 'expense'
       if (txType !== 'expense' && catType !== 'expense') continue
       
-      const amt = Number(t.amount || 0)
-      const val = amt < 0 ? Math.abs(amt) : amt
-      const name = catData?.name || 'Non catégorisé'
-      sums[name] = (sums[name] || 0) + val
+      // Séparer dépenses fixes et variables
+      if (isFixedCategory(name)) {
+        fixedSums[name] = (fixedSums[name] || 0) + val
+        totalFixedExpenses += val
+      } else {
+        sums[name] = (sums[name] || 0) + val
+        totalVariableExpenses += val
+      }
     }
 
-    const result = Object.keys(sums).map(k => ({ 
+    // Dépenses variables (pour le budget)
+    const variableTotals = Object.keys(sums).map(k => ({ 
       category: k, 
       total: Number(sums[k].toFixed(2)), 
-      avgPerMonth: Number((sums[k] / monthsWindow).toFixed(2)) 
+      avgPerMonth: Number((sums[k] / monthsWindow).toFixed(2)),
+      isFixed: false
     }))
-    result.sort((a, b) => b.total - a.total)
+    variableTotals.sort((a, b) => b.total - a.total)
+    
+    // Dépenses fixes (pour info)
+    const fixedTotals = Object.keys(fixedSums).map(k => ({ 
+      category: k, 
+      total: Number(fixedSums[k].toFixed(2)), 
+      avgPerMonth: Number((fixedSums[k] / monthsWindow).toFixed(2)),
+      isFixed: true
+    }))
+    fixedTotals.sort((a, b) => b.total - a.total)
 
     return NextResponse.json({ 
-      totals: result, 
+      totals: variableTotals,
+      fixedTotals: fixedTotals,
+      summary: {
+        totalIncome: Number(totalIncome.toFixed(2)),
+        totalFixedExpenses: Number(totalFixedExpenses.toFixed(2)),
+        totalVariableExpenses: Number(totalVariableExpenses.toFixed(2)),
+        availableForVariable: Number((totalIncome - totalFixedExpenses).toFixed(2)),
+        potentialSavings: Number((totalIncome - totalFixedExpenses - totalVariableExpenses).toFixed(2))
+      },
       meta: { monthsWindow, startDate, endDate, useNonArchived } 
     })
   } catch (err) {

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/db'
 import { auth } from '@clerk/nextjs/server'
 
-export async function GET(request: Request) {
+export async function GET(_request: Request) {
   try {
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })

@@ -5,7 +5,7 @@ import { useUser } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, Filter, Trash2, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react'
+import { Plus, Filter, Trash2, TrendingUp, TrendingDown, RefreshCw, Pencil, X, Clock } from 'lucide-react'
 import { useSelectedMonth, getCurrentMonth } from '@/lib/useSelectedMonth'
 import { getMonthClosure } from '@/lib/utils'
 import { motion } from 'framer-motion'
@@ -59,6 +59,8 @@ export default function TransactionsPage() {
   const [showUpcoming, setShowUpcoming] = useState(false)
   const [showAllMonths, setShowAllMonths] = useState(false)
   const [search, setSearch] = useState('')
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
+  const [categories, setCategories] = useState<Category[]>([])
   const [searchDate, setSearchDate] = useState('')
   const [searchAmount, setSearchAmount] = useState('')
   const [searchCategory, setSearchCategory] = useState('')
@@ -166,6 +168,16 @@ export default function TransactionsPage() {
       })
     }
 
+    // Filtrer les transactions futures si showUpcoming n'est pas actif
+    const today = new Date().toISOString().split('T')[0]
+    if (!showUpcoming) {
+      filtered = filtered.filter(txn => {
+        // Normaliser la date de la transaction (prendre seulement YYYY-MM-DD)
+        const txnDate = txn.date ? txn.date.split('T')[0] : ''
+        return txnDate <= today
+      })
+    }
+
     // Appliquer les filtres supplémentaires
     return filtered.filter(txn => {
       if (typeFilter !== 'all' && txn.type !== typeFilter) return false
@@ -210,11 +222,60 @@ export default function TransactionsPage() {
       // Notify other components (eg. CreditTrackingCard) that credits changed
       try {
         window.dispatchEvent(new CustomEvent('credits:changed'))
-      } catch (e) {
+      } catch {
         // ignore in non-browser env
       }
     } catch (error) {
       console.error('Erreur lors de la suppression:', error)
+    }
+  }
+
+  // Charger les catégories pour l'édition
+  const fetchCategories = async (type: 'income' | 'expense') => {
+    try {
+      const res = await fetch(`/api/categories?type=${type}`)
+      if (res.ok) {
+        const data = await res.json()
+        setCategories(data)
+      }
+    } catch (error) {
+      console.error('Erreur chargement catégories:', error)
+    }
+  }
+
+  // Ouvrir le modal d'édition
+  const handleEditTransaction = (transaction: Transaction) => {
+    setEditingTransaction(transaction)
+    fetchCategories(transaction.type)
+  }
+
+  // Sauvegarder les modifications
+  const handleSaveEdit = async (updatedData: Partial<Transaction>) => {
+    if (!editingTransaction) return
+
+    try {
+      const res = await fetch(`/api/expenses/${editingTransaction.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedData)
+      })
+
+      if (res.ok) {
+        await fetchData()
+        setEditingTransaction(null)
+        try {
+          window.dispatchEvent(new CustomEvent('transactions:changed'))
+          window.dispatchEvent(new CustomEvent('accounts:changed'))
+        } catch {
+          // ignore
+        }
+      } else {
+        const error = await res.json()
+        alert('Erreur: ' + (error.error || 'Impossible de modifier'))
+      }
+    } catch (error) {
+      console.error('Erreur modification:', error)
+      alert('Erreur lors de la modification')
     }
   }
 
@@ -523,6 +584,14 @@ export default function TransactionsPage() {
                     <Button
                       variant="ghost"
                       size="icon"
+                      onClick={() => handleEditTransaction(transaction)}
+                      className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/20 h-9 w-9 md:h-10 md:w-10 rounded-lg transition-all"
+                    >
+                      <Pencil className="w-4 h-4 md:w-5 md:h-5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       onClick={() => handleDeleteTransaction(transaction.id)}
                       className="text-red-400 hover:text-red-300 hover:bg-red-500/20 h-9 w-9 md:h-10 md:w-10 rounded-lg transition-all"
                     >
@@ -535,6 +604,171 @@ export default function TransactionsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Modal d'édition */}
+      {editingTransaction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="w-full max-w-md"
+          >
+            <Card className="bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700 shadow-2xl">
+              <CardHeader className="border-b border-slate-700 pb-4">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-xl font-bold text-white">Modifier la transaction</CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setEditingTransaction(null)}
+                    className="text-slate-400 hover:text-white"
+                  >
+                    <X className="w-5 h-5" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6 space-y-4">
+                {/* Type (non modifiable visuellement) */}
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-700/50">
+                  <span className={`text-sm font-medium ${editingTransaction.type === 'income' ? 'text-green-400' : 'text-red-400'}`}>
+                    {editingTransaction.type === 'income' ? '💰 Revenu' : '💸 Dépense'}
+                  </span>
+                  {editingTransaction.isRecurring && (
+                    <span className="px-2 py-0.5 text-xs bg-purple-500/20 text-purple-300 rounded-md">
+                      <RefreshCw className="w-3 h-3 inline mr-1" />
+                      Récurrent
+                    </span>
+                  )}
+                </div>
+
+                {/* Montant */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-200">Montant (€)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    defaultValue={editingTransaction.amount}
+                    onChange={(e) => setEditingTransaction({
+                      ...editingTransaction,
+                      amount: parseFloat(e.target.value) || 0
+                    })}
+                    className="w-full px-3 py-2 rounded-lg bg-slate-700/50 border border-slate-600 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Catégorie */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-200">Catégorie</label>
+                  <select
+                    value={editingTransaction.categoryId}
+                    onChange={(e) => setEditingTransaction({
+                      ...editingTransaction,
+                      categoryId: e.target.value
+                    })}
+                    className="w-full px-3 py-2 rounded-lg bg-slate-700/50 border border-slate-600 text-white focus:border-blue-500"
+                  >
+                    <option value={editingTransaction.categoryId}>
+                      {editingTransaction.category?.icon} {editingTransaction.category?.name}
+                    </option>
+                    {categories.filter(c => c.id !== editingTransaction.categoryId).map(cat => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.icon} {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Compte */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-200">Compte</label>
+                  <select
+                    value={editingTransaction.accountId}
+                    onChange={(e) => setEditingTransaction({
+                      ...editingTransaction,
+                      accountId: e.target.value
+                    })}
+                    className="w-full px-3 py-2 rounded-lg bg-slate-700/50 border border-slate-600 text-white focus:border-blue-500"
+                  >
+                    {accounts.map(acc => (
+                      <option key={acc.id} value={acc.id}>{acc.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Date */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-200">Date</label>
+                  <input
+                    type="date"
+                    defaultValue={editingTransaction.date.split('T')[0]}
+                    onChange={(e) => setEditingTransaction({
+                      ...editingTransaction,
+                      date: e.target.value
+                    })}
+                    className="w-full px-3 py-2 rounded-lg bg-slate-700/50 border border-slate-600 text-white focus:border-blue-500"
+                  />
+                </div>
+
+                {/* Note */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-200">Note (optionnel)</label>
+                  <input
+                    type="text"
+                    defaultValue={editingTransaction.note || ''}
+                    onChange={(e) => setEditingTransaction({
+                      ...editingTransaction,
+                      note: e.target.value || null
+                    })}
+                    placeholder="Ajouter une note..."
+                    className="w-full px-3 py-2 rounded-lg bg-slate-700/50 border border-slate-600 text-white placeholder:text-slate-400 focus:border-blue-500"
+                  />
+                </div>
+
+                {/* Récurrence (si récurrent) */}
+                {editingTransaction.isRecurring && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-200">Jour de récurrence</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="31"
+                      defaultValue={editingTransaction.recurrenceDay || 1}
+                      onChange={(e) => setEditingTransaction({
+                        ...editingTransaction,
+                        recurrenceDay: parseInt(e.target.value) || 1
+                      })}
+                      className="w-full px-3 py-2 rounded-lg bg-slate-700/50 border border-slate-600 text-white focus:border-blue-500"
+                    />
+                  </div>
+                )}
+
+                {/* Boutons */}
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    onClick={() => handleSaveEdit({
+                      amount: editingTransaction.amount,
+                      category_id: editingTransaction.categoryId,
+                      account_id: editingTransaction.accountId,
+                      date: editingTransaction.date,
+                      note: editingTransaction.note
+                    } as any)}
+                    className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+                  >
+                    Enregistrer
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setEditingTransaction(null)}
+                    className="bg-slate-700/50 border-slate-600 hover:bg-slate-700"
+                  >
+                    Annuler
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+      )}
     </motion.div>
   )
 }

@@ -13,30 +13,50 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Calculator, 
   Target, 
-  TrendingDown, 
   ChevronRight, 
   AlertTriangle,
   CheckCircle2,
   Sparkles,
   Calendar,
   RefreshCw,
-  PieChart,
-  Zap
+  Zap,
+  Wallet,
+  PiggyBank,
+  ShoppingBag,
+  Lock
 } from 'lucide-react'
+
+// Catégories fixes à exclure du budget variable
+const FIXED_CATEGORIES = ['logement', 'allocation', 'assurances', 'santé', 'abonnements']
+
+// Vérifier si une catégorie est fixe
+const isFixedCategory = (categoryName: string) => {
+  const normalized = categoryName.toLowerCase().trim()
+  return FIXED_CATEGORIES.some(fixed => normalized.includes(fixed))
+}
 
 export default function PrevisionnelPage() {
   const { isSignedIn, isLoaded } = useUser()
   const router = useRouter()
   const { userType, isLoading: isLoadingSettings } = useUserSettings()
-  const [activeTab, setActiveTab] = useState<'totals' | 'reco'>('totals')
+  const [activeTab, setActiveTab] = useState<'variable' | 'fixed' | 'reco'>('variable')
   const [recoVisible, setRecoVisible] = useState(false)
   const fmt = (n: number) => new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + ' €'
   const [totals, setTotals] = useState<{ category: string; total: number }[]>([])
   const [monthsWindow, setMonthsWindow] = useState<number>(1)
   const [loading, setLoading] = useState(false)
   const [targets, setTargets] = useState<Record<string, number>>({})
-  const [budgets, setBudgets] = useState<{ category: string; avgPerMonth: number; recommendedMonthly: number }[]>([])
+  const [budgets, setBudgets] = useState<{ category: string; avgPerMonth: number; recommendedMonthly: number; isFixed?: boolean }[]>([])
   const [fileError, setFileError] = useState<string | null>(null)
+  
+  const [fixedTotals, setFixedTotals] = useState<{ category: string; total: number }[]>([])
+  const [summary, setSummary] = useState<{
+    totalIncome: number
+    totalFixedExpenses: number
+    totalVariableExpenses: number
+    availableForVariable: number
+    potentialSavings: number
+  } | null>(null)
 
   // Rediriger les visionneurs vers la page partage
   useEffect(() => {
@@ -82,8 +102,12 @@ export default function PrevisionnelPage() {
         if (!res.ok) {
           console.error('Erreur totals', json)
           setTotals([])
+          setFixedTotals([])
+          setSummary(null)
         } else {
           setTotals(json.totals || [])
+          setFixedTotals(json.fixedTotals || [])
+          setSummary(json.summary || null)
         }
       } catch (err) {
         console.error('Erreur fetch totals', err)
@@ -137,11 +161,15 @@ export default function PrevisionnelPage() {
     }).catch(console.error)
   }
 
-  // Calculs pour les stats
-  const totalSpent = totals.reduce((sum, t) => sum + t.total, 0)
-  const totalBudget = Object.values(targets).reduce((sum, t) => sum + (t || 0), 0)
+  // Calculs pour les stats - uniquement dépenses variables
+  const totalVariableSpent = totals.reduce((sum, t) => sum + t.total, 0)
   const categoriesOverBudget = totals.filter(t => targets[t.category] && t.total > targets[t.category]).length
   const categoriesUnderBudget = totals.filter(t => targets[t.category] && t.total <= targets[t.category]).length
+  
+  // Budget disponible et épargne
+  const availableForVariable = summary?.availableForVariable || 0
+  const potentialSavings = summary?.potentialSavings || 0
+  const remainingBudget = availableForVariable - totalVariableSpent
 
   return (
     <div className="pb-20 px-3 sm:px-4 md:px-8 space-y-6 w-full max-w-6xl mx-auto">
@@ -159,7 +187,7 @@ export default function PrevisionnelPage() {
               </div>
               Prévisionnel
             </h1>
-            <p className="text-slate-400 text-sm mt-1">Gérez vos budgets et objectifs de dépenses</p>
+            <p className="text-slate-400 text-sm mt-1">Gérez votre budget variable et optimisez votre épargne</p>
           </div>
           
           {!isCurrentMonth && (
@@ -177,6 +205,58 @@ export default function PrevisionnelPage() {
         </div>
       </motion.div>
 
+      {/* Carte épargne potentielle - mise en avant */}
+      {summary && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+        >
+          <Card className={`border-2 shadow-xl ${
+            potentialSavings >= 0 
+              ? 'bg-gradient-to-br from-emerald-900/40 to-green-800/20 border-emerald-500/40 shadow-emerald-500/10' 
+              : 'bg-gradient-to-br from-red-900/40 to-red-800/20 border-red-500/40 shadow-red-500/10'
+          }`}>
+            <CardContent className="p-5">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className={`p-3 rounded-xl ${potentialSavings >= 0 ? 'bg-emerald-500/20' : 'bg-red-500/20'}`}>
+                    <PiggyBank className={`w-8 h-8 ${potentialSavings >= 0 ? 'text-emerald-400' : 'text-red-400'}`} />
+                  </div>
+                  <div>
+                    <p className={`text-sm font-medium ${potentialSavings >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
+                      {potentialSavings >= 0 ? 'Épargne potentielle ce mois' : 'Déficit prévu ce mois'}
+                    </p>
+                    <p className={`text-3xl md:text-4xl font-bold ${potentialSavings >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {potentialSavings >= 0 ? '+' : ''}{fmt(potentialSavings)}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                  <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                    <p className="text-slate-400 text-xs">Revenus</p>
+                    <p className="text-white font-semibold">{fmt(summary.totalIncome)}</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                    <p className="text-slate-400 text-xs flex items-center gap-1">
+                      <Lock className="w-3 h-3" /> Charges fixes
+                    </p>
+                    <p className="text-orange-400 font-semibold">-{fmt(summary.totalFixedExpenses)}</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/50 col-span-2 md:col-span-1">
+                    <p className="text-slate-400 text-xs flex items-center gap-1">
+                      <ShoppingBag className="w-3 h-3" /> Budget variable
+                    </p>
+                    <p className="text-blue-400 font-semibold">{fmt(availableForVariable)}</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
       {/* Cartes de statistiques */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
@@ -188,11 +268,11 @@ export default function PrevisionnelPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-blue-300/70 uppercase tracking-wide">Total dépensé</p>
-                <p className="text-xl md:text-2xl font-bold text-blue-400 mt-1">{fmt(totalSpent)}</p>
+                <p className="text-xs text-blue-300/70 uppercase tracking-wide">Dépenses variables</p>
+                <p className="text-xl md:text-2xl font-bold text-blue-400 mt-1">{fmt(totalVariableSpent)}</p>
               </div>
               <div className="p-2 rounded-lg bg-blue-500/20">
-                <TrendingDown className="w-5 h-5 text-blue-400" />
+                <ShoppingBag className="w-5 h-5 text-blue-400" />
               </div>
             </div>
           </CardContent>
@@ -202,11 +282,13 @@ export default function PrevisionnelPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-purple-300/70 uppercase tracking-wide">Budget total</p>
-                <p className="text-xl md:text-2xl font-bold text-purple-400 mt-1">{fmt(totalBudget)}</p>
+                <p className="text-xs text-purple-300/70 uppercase tracking-wide">Reste à dépenser</p>
+                <p className={`text-xl md:text-2xl font-bold mt-1 ${remainingBudget >= 0 ? 'text-purple-400' : 'text-red-400'}`}>
+                  {fmt(remainingBudget)}
+                </p>
               </div>
               <div className="p-2 rounded-lg bg-purple-500/20">
-                <Target className="w-5 h-5 text-purple-400" />
+                <Wallet className="w-5 h-5 text-purple-400" />
               </div>
             </div>
           </CardContent>
@@ -258,18 +340,21 @@ export default function PrevisionnelPage() {
                   Paramètres d&apos;analyse
                 </CardTitle>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400">Fenêtre:</span>
+                  <span className="text-xs text-slate-400">Analyser:</span>
                   <select 
                     value={monthsWindow} 
                     onChange={(e) => setMonthsWindow(Number(e.target.value))}
                     className="px-3 py-1.5 rounded-lg bg-slate-700/50 text-white text-sm border border-slate-600/50 focus:border-purple-500/50 focus:outline-none"
                   >
                     {[1, 2, 3, 6, 12].map(n => (
-                      <option key={n} value={n}>{n} mois</option>
+                      <option key={n} value={n}>{n} mois précédent{n > 1 ? 's' : ''}</option>
                     ))}
                   </select>
                 </div>
               </div>
+              <p className="text-xs text-slate-500 mt-2">
+                Les recommandations sont basées sur vos {monthsWindow} mois précédent{monthsWindow > 1 ? 's' : ''} pour vous aider à mieux gérer ce mois-ci
+              </p>
             </CardHeader>
             <CardContent className="p-4">
               <div className="flex flex-wrap gap-2">
@@ -300,23 +385,42 @@ export default function PrevisionnelPage() {
           {/* Onglets */}
           <Card className="border-slate-700/50 bg-gradient-to-br from-slate-800/80 to-slate-900/80 shadow-xl overflow-hidden">
             <CardHeader className="border-b border-slate-700/50 pb-0 pt-4 px-4">
-              <div className="flex gap-1">
+              <div className="flex gap-1 flex-wrap">
                 <button
-                  onClick={() => setActiveTab('totals')}
+                  onClick={() => setActiveTab('variable')}
                   className={`px-4 py-2.5 text-sm font-medium rounded-t-lg transition-all relative ${
-                    activeTab === 'totals' 
+                    activeTab === 'variable' 
                       ? 'text-white bg-slate-700/50' 
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/30'
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <PieChart className="w-4 h-4" />
-                    <span>Dépenses par catégorie</span>
+                    <ShoppingBag className="w-4 h-4" />
+                    <span>Budget variable</span>
                   </div>
-                  {activeTab === 'totals' && (
+                  {activeTab === 'variable' && (
                     <motion.div 
                       layoutId="activeTab"
                       className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-500 to-blue-500"
+                    />
+                  )}
+                </button>
+                <button
+                  onClick={() => setActiveTab('fixed')}
+                  className={`px-4 py-2.5 text-sm font-medium rounded-t-lg transition-all relative ${
+                    activeTab === 'fixed' 
+                      ? 'text-white bg-slate-700/50' 
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/30'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Lock className="w-4 h-4" />
+                    <span>Charges fixes</span>
+                  </div>
+                  {activeTab === 'fixed' && (
+                    <motion.div 
+                      layoutId="activeTab"
+                      className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-orange-500 to-red-500"
                     />
                   )}
                 </button>
@@ -345,22 +449,30 @@ export default function PrevisionnelPage() {
             </CardHeader>
             <CardContent className="p-4">
               <AnimatePresence mode="wait">
-                {activeTab === 'totals' && (
+                {activeTab === 'variable' && (
                   <motion.div
-                    key="totals"
+                    key="variable"
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
                     className="space-y-3"
                   >
+                    <div className="flex items-center justify-between mb-4 p-3 rounded-lg bg-blue-900/20 border border-blue-500/20">
+                      <div className="flex items-center gap-2">
+                        <ShoppingBag className="w-4 h-4 text-blue-400" />
+                        <span className="text-sm text-blue-300">Ce sont les dépenses que vous pouvez contrôler</span>
+                      </div>
+                    </div>
+                    
                     {loading ? (
                       <div className="flex items-center justify-center py-12">
                         <RefreshCw className="w-6 h-6 text-slate-400 animate-spin" />
                       </div>
                     ) : totals.length === 0 ? (
                       <div className="text-center py-12">
-                        <PieChart className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                        <p className="text-slate-400">Aucune dépense trouvée pour cette période</p>
+                        <ShoppingBag className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                        <p className="text-slate-400">Aucune dépense variable trouvée</p>
+                        <p className="text-xs text-slate-500 mt-1">Les catégories fixes sont dans l&apos;onglet &quot;Charges fixes&quot;</p>
                       </div>
                     ) : (
                       <div className="space-y-2">
@@ -446,6 +558,72 @@ export default function PrevisionnelPage() {
                   </motion.div>
                 )}
 
+                {activeTab === 'fixed' && (
+                  <motion.div
+                    key="fixed"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="space-y-3"
+                  >
+                    <div className="flex items-center justify-between mb-4 p-3 rounded-lg bg-orange-900/20 border border-orange-500/20">
+                      <div className="flex items-center gap-2">
+                        <Lock className="w-4 h-4 text-orange-400" />
+                        <span className="text-sm text-orange-300">Dépenses incompressibles (loyer, assurances, abonnements...)</span>
+                      </div>
+                    </div>
+                    
+                    {loading ? (
+                      <div className="flex items-center justify-center py-12">
+                        <RefreshCw className="w-6 h-6 text-slate-400 animate-spin" />
+                      </div>
+                    ) : fixedTotals.length === 0 ? (
+                      <div className="text-center py-12">
+                        <Lock className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                        <p className="text-slate-400">Aucune charge fixe trouvée</p>
+                        <p className="text-xs text-slate-500 mt-1">Catégories: Logement, Allocation, Assurances, Santé, Abonnements</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {fixedTotals.map((t, idx) => (
+                          <motion.div 
+                            key={t.category}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: idx * 0.03 }}
+                            className="p-3 rounded-xl border bg-orange-900/10 border-orange-500/20"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-lg bg-orange-500/20">
+                                  <Lock className="w-4 h-4 text-orange-400" />
+                                </div>
+                                <div>
+                                  <span className="font-medium text-sm text-white">{t.category}</span>
+                                  <p className="text-xs text-slate-400">Charge fixe mensuelle</p>
+                                </div>
+                              </div>
+                              <span className="text-lg font-bold text-orange-400">
+                                {fmt(t.total)}
+                              </span>
+                            </div>
+                          </motion.div>
+                        ))}
+                        
+                        {/* Total des charges fixes */}
+                        <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-orange-900/30 to-red-900/30 border border-orange-500/30">
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium text-orange-300">Total charges fixes</span>
+                            <span className="text-xl font-bold text-orange-400">
+                              {fmt(summary?.totalFixedExpenses || 0)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+
                 {activeTab === 'reco' && (
                   <motion.div
                     key="reco"
@@ -454,6 +632,13 @@ export default function PrevisionnelPage() {
                     exit={{ opacity: 0, y: -10 }}
                     className="space-y-3"
                   >
+                    <div className="flex items-center justify-between mb-4 p-3 rounded-lg bg-purple-900/20 border border-purple-500/20">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-purple-400" />
+                        <span className="text-sm text-purple-300">Recommandations pour vos dépenses variables uniquement</span>
+                      </div>
+                    </div>
+                    
                     {fileError && (
                       <div className="p-4 bg-red-900/30 border border-red-500/30 rounded-xl flex items-start gap-3">
                         <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
@@ -464,9 +649,11 @@ export default function PrevisionnelPage() {
                       </div>
                     )}
                     
-                    {budgets.length > 0 && (
+                    {budgets.filter(b => !b.isFixed && !isFixedCategory(b.category)).length > 0 && (
                       <div className="space-y-2">
-                        {budgets.map((b, idx) => (
+                        {budgets
+                          .filter(b => !b.isFixed && !isFixedCategory(b.category))
+                          .map((b, idx) => (
                           <motion.div 
                             key={b.category}
                             initial={{ opacity: 0, x: -20 }}
@@ -529,25 +716,70 @@ export default function PrevisionnelPage() {
           <Card className="border-slate-700/50 bg-gradient-to-br from-slate-800/80 to-slate-900/80 shadow-xl">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
-                <TrendingDown className="w-4 h-4 text-slate-400" />
-                Résumé du mois
+                <PiggyBank className="w-4 h-4 text-emerald-400" />
+                Objectif épargne
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between py-2 border-b border-slate-700/50">
-                <span className="text-xs text-slate-400">Catégories suivies</span>
-                <span className="text-sm font-medium text-white">{totals.length}</span>
+                <span className="text-xs text-slate-400">Revenus</span>
+                <span className="text-sm font-medium text-green-400">+{fmt(summary?.totalIncome || 0)}</span>
               </div>
               <div className="flex items-center justify-between py-2 border-b border-slate-700/50">
-                <span className="text-xs text-slate-400">Objectifs définis</span>
-                <span className="text-sm font-medium text-white">{Object.keys(targets).filter(k => targets[k] > 0).length}</span>
+                <span className="text-xs text-slate-400">Charges fixes</span>
+                <span className="text-sm font-medium text-orange-400">-{fmt(summary?.totalFixedExpenses || 0)}</span>
               </div>
-              <div className="flex items-center justify-between py-2">
-                <span className="text-xs text-slate-400">Reste à budgéter</span>
-                <span className={`text-sm font-medium ${totalBudget >= totalSpent ? 'text-green-400' : 'text-red-400'}`}>
-                  {fmt(Math.abs(totalBudget - totalSpent))}
+              <div className="flex items-center justify-between py-2 border-b border-slate-700/50">
+                <span className="text-xs text-slate-400">Dépenses variables</span>
+                <span className="text-sm font-medium text-blue-400">-{fmt(summary?.totalVariableExpenses || 0)}</span>
+              </div>
+              <div className="flex items-center justify-between py-2 pt-3 border-t border-slate-600">
+                <span className="text-sm font-medium text-emerald-300">Épargne possible</span>
+                <span className={`text-lg font-bold ${(summary?.potentialSavings || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {fmt(summary?.potentialSavings || 0)}
                 </span>
               </div>
+            </CardContent>
+          </Card>
+          
+          {/* Conseils */}
+          <Card className="border-slate-700/50 bg-gradient-to-br from-slate-800/80 to-slate-900/80 shadow-xl">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-yellow-400" />
+                Conseils
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {(summary?.potentialSavings || 0) > 0 ? (
+                <div className="p-3 rounded-lg bg-emerald-900/20 border border-emerald-500/20">
+                  <p className="text-xs text-emerald-300">
+                    🎉 Vous pouvez épargner <strong>{fmt(summary?.potentialSavings || 0)}</strong> ce mois !
+                  </p>
+                </div>
+              ) : (
+                <div className="p-3 rounded-lg bg-red-900/20 border border-red-500/20">
+                  <p className="text-xs text-red-300">
+                    ⚠️ Vos dépenses dépassent vos revenus de <strong>{fmt(Math.abs(summary?.potentialSavings || 0))}</strong>
+                  </p>
+                </div>
+              )}
+              
+              {remainingBudget > 0 && (
+                <div className="p-3 rounded-lg bg-blue-900/20 border border-blue-500/20">
+                  <p className="text-xs text-blue-300">
+                    💡 Il vous reste <strong>{fmt(remainingBudget)}</strong> de budget variable
+                  </p>
+                </div>
+              )}
+              
+              {categoriesOverBudget > 0 && (
+                <div className="p-3 rounded-lg bg-amber-900/20 border border-amber-500/20">
+                  <p className="text-xs text-amber-300">
+                    📊 {categoriesOverBudget} catégorie{categoriesOverBudget > 1 ? 's' : ''} en dépassement
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>

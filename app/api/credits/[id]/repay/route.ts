@@ -2,14 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/db'
 import { auth } from '@clerk/nextjs/server'
 
-export async function POST(request: NextRequest, context: any) {
+export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
-    // context.params can be a Promise in some Next.js typings, resolve if needed
-    const rawParams = context?.params
-    const resolvedParams = rawParams && typeof rawParams.then === 'function' ? await rawParams : rawParams
-    const creditId = resolvedParams?.id
+    const { id: creditId } = await context.params
     const body = await request.json()
     const amount = parseFloat(body.amount)
     const accountId = body.accountId
@@ -56,8 +53,8 @@ export async function POST(request: NextRequest, context: any) {
         .eq('name', 'Crédit')
         .maybeSingle()
 
-      if (catByName && (catByName as any).id) {
-        categoryId = (catByName as any).id
+      if (catByName && catByName.id) {
+        categoryId = catByName.id
       } else {
         const { data: firstExpenseCat } = await supabase
           .from('categories')
@@ -97,7 +94,7 @@ export async function POST(request: NextRequest, context: any) {
 
     // Mettre à jour outstanding du crédit
     const newOutstanding = parseFloat(credit.outstanding) - amount
-    const updates: any = { outstanding: newOutstanding }
+    const updates: { outstanding: number; is_closed?: boolean } = { outstanding: newOutstanding }
     if (newOutstanding <= 0) updates.is_closed = true
 
     const { data: updatedCredit, error: creditUpdateError } = await supabase

@@ -2,13 +2,11 @@ import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/db'
 import { auth } from '@clerk/nextjs/server'
 
-export async function DELETE(request: Request, context: any) {
+export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
-    const rawParams = context?.params
-    const resolvedParams = rawParams && typeof rawParams.then === 'function' ? await rawParams : rawParams
-    const id = resolvedParams?.id
+    const { id } = await context.params
     if (!id) return NextResponse.json({ error: 'Id manquant' }, { status: 400 })
 
     // Dissocier les transactions du crédit au lieu de supprimer
@@ -37,13 +35,11 @@ export async function DELETE(request: Request, context: any) {
   }
 }
 
-export async function PATCH(request: Request, context: any) {
+export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
-    const rawParams = context?.params
-    const resolvedParams = rawParams && typeof rawParams.then === 'function' ? await rawParams : rawParams
-    const id = resolvedParams?.id
+    const { id } = await context.params
     if (!id) return NextResponse.json({ error: 'Id manquant' }, { status: 400 })
 
     const body = await request.json()

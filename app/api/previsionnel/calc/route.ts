@@ -7,7 +7,7 @@ type Tx = {
   category?: string
 }
 
-function parseDate(d: any) {
+function parseDate(d: string | number | Date) {
   const dt = new Date(d)
   if (isNaN(dt.getTime())) return null
   return dt

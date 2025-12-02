@@ -11,7 +11,6 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url)
     const accountId = searchParams.get('accountId')
-    const category = searchParams.get('category')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const type = searchParams.get('type')
@@ -54,7 +53,25 @@ export async function GET(request: Request) {
     if (error) throw error
     
     // Mapper les champs pour correspondre au front-end
-    const mappedTransactions = (transactions || []).map((txn: any) => ({
+    interface TransactionRow {
+      id: string
+      amount: number
+      type: string
+      category_id: string
+      date: string
+      note: string | null
+      account_id: string
+      account: Record<string, unknown>
+      category: Record<string, unknown>
+      is_recurring: boolean
+      recurrence_frequency: string | null
+      recurrence_day: number | null
+      is_active: boolean
+      created_at: string
+      updated_at: string
+      archived: boolean
+    }
+    const mappedTransactions = (transactions || []).map((txn: TransactionRow) => ({
       id: txn.id,
       amount: txn.amount,
       type: txn.type,
@@ -90,7 +107,7 @@ export async function POST(request: Request) {
     const body = await request.json()
     
     // Vérifier que le compte appartient à l'utilisateur
-    const { data: account, error: accountError } = await supabase
+    const { data: account } = await supabase
       .from('accounts')
       .select('id')
       .eq('id', body.accountId)

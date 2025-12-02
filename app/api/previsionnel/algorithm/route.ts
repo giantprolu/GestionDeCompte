@@ -13,13 +13,15 @@ type Budget = {
   base?: number
 }
 
-function normalizeName(s: any) {
+function normalizeName(s: unknown) {
   return (s || '').toString().trim().toLowerCase()
 }
 
-// Keyword lists for fixed expenses (can be extended)
+// Keyword lists for fixed expenses - catégories à exclure du budget variable
 const FIXED_KEYWORDS = [
-  'logement', 'loyer', 'assurance', 'assurances', 'abonnement', 'facture', 'impot', 'impôts', 'impots', 'crédit', 'credit', 'remboursement', 'épargne', 'epargne'
+  'logement', 'loyer', 'allocation', 'assurance', 'assurances', 'santé', 'sante', 
+  'abonnement', 'abonnements', 'facture', 'impot', 'impôts', 'impots', 
+  'crédit', 'credit', 'remboursement', 'épargne', 'epargne'
 ]
 
 // Helper pour obtenir le mois précédent au format YYYY-MM
@@ -27,13 +29,6 @@ function getPreviousMonth(monthYear: string): string {
   const [year, month] = monthYear.split('-').map(Number)
   const prevDate = new Date(year, month - 2, 1)
   return `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`
-}
-
-// Helper pour ajouter un jour à une date ISO
-function addOneDay(dateStr: string): string {
-  const d = new Date(dateStr)
-  d.setDate(d.getDate() + 1)
-  return d.toISOString().split('T')[0]
 }
 
 export async function POST(request: Request) {
@@ -45,8 +40,6 @@ export async function POST(request: Request) {
     const monthsWindow = Number(body.monthsWindow) || 3
     const selectedMonth = body.selectedMonth // Format: YYYY-MM
     const savingsRate = Number(body.savingsRate ?? 0.1)
-    const ratioMin = Number(body.ratioMin ?? 0.6)
-    const perCategoryMin = Number(body.perCategoryMin ?? 10)
     const objectifs = body.targets || {};
 
     // load user's accounts
@@ -55,89 +48,74 @@ export async function POST(request: Request) {
       .select('id')
       .eq('user_id', userId)
 
-    const accountIds = (accounts || []).map((a: any) => a.id)
+    const accountIds = (accounts || []).map((a: { id: string }) => a.id)
 
     if (accountIds.length === 0) {
       return NextResponse.json({ error: 'Aucun compte trouvé' }, { status: 400 })
     }
 
-    // Déterminer la période en utilisant les clôtures de mois
-    let startDate: string | null = null
-    let endDate: string | null = null
-    let useNonArchived = false
-
-    if (selectedMonth) {
-      // Récupérer la clôture du mois sélectionné
-      const { data: closure } = await supabase
-        .from('month_closures')
-        .select('start_date, end_date')
-        .eq('user_id', userId)
-        .eq('month_year', selectedMonth)
-        .single()
-
-      if (closure) {
-        // Mois clôturé - utiliser ses dates
-        startDate = closure.start_date
-        endDate = closure.end_date
-      } else {
-        // Mois pas encore clôturé (mois en cours)
-        // Chercher la clôture du mois précédent pour avoir la date de début
-        const prevMonth = getPreviousMonth(selectedMonth)
-        const { data: prevClosure } = await supabase
-          .from('month_closures')
-          .select('end_date')
-          .eq('user_id', userId)
-          .eq('month_year', prevMonth)
-          .single()
-
-        if (prevClosure) {
-          // Le mois actuel commence le lendemain de la fin du mois précédent
-          startDate = addOneDay(prevClosure.end_date)
-          useNonArchived = true
-        } else {
-          // Aucune clôture trouvée - utiliser toutes les transactions non archivées
-          useNonArchived = true
-        }
-      }
-    } else {
-      // Pas de mois sélectionné - utiliser les transactions non archivées
-      useNonArchived = true
-    }
-
-    // fetch transactions
-    let txs
-    let error
+    // Pour les recommandations, on utilise les N mois PRÉCÉDENTS (pas le mois actuel)
+    // Car on ne peut pas faire de recommandations basées sur des données incomplètes
     
-    if (useNonArchived) {
-      let query = supabase
-        .from('transactions')
-        .select('amount,date,type,category:categories(name)')
-        .in('account_id', accountIds)
-        .neq('archived', true)
-      
-      if (startDate) {
-        query = query.gte('date', startDate)
+    // Calculer les mois précédents à analyser
+    const monthsToAnalyze: string[] = []
+    let currentAnalysisMonth = selectedMonth || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
+    
+    for (let i = 0; i < monthsWindow; i++) {
+      currentAnalysisMonth = getPreviousMonth(currentAnalysisMonth)
+      monthsToAnalyze.push(currentAnalysisMonth)
+    }
+
+    // Récupérer les clôtures des mois à analyser
+    const { data: closures } = await supabase
+      .from('month_closures')
+      .select('month_year, start_date, end_date')
+      .eq('user_id', userId)
+      .in('month_year', monthsToAnalyze)
+
+    // Construire les périodes à partir des clôtures trouvées
+    const periods: { start: string; end: string }[] = []
+    
+    if (closures && closures.length > 0) {
+      for (const closure of closures) {
+        periods.push({ start: closure.start_date, end: closure.end_date })
       }
-      
-      const result = await query
-      txs = result.data
-      error = result.error
-    } else {
-      const result = await supabase
+    }
+
+    // Si aucune clôture trouvée, utiliser des dates calendaires approximatives
+    if (periods.length === 0) {
+      for (const monthYear of monthsToAnalyze) {
+        const [year, month] = monthYear.split('-').map(Number)
+        const startOfMonth = `${year}-${String(month).padStart(2, '0')}-01`
+        const endOfMonth = new Date(year, month, 0).toISOString().split('T')[0]
+        periods.push({ start: startOfMonth, end: endOfMonth })
+      }
+    }
+
+    // Fetch transactions pour toutes les périodes
+    interface TransactionRecord {
+      amount: number
+      date: string
+      type: string
+      category?: { name?: string } | { name?: string }[]
+    }
+    let allTransactions: TransactionRecord[] = []
+    
+    for (const period of periods) {
+      const { data: txs, error } = await supabase
         .from('transactions')
         .select('amount,date,type,category:categories(name)')
         .in('account_id', accountIds)
-        .gte('date', startDate!)
-        .lte('date', endDate!)
-      txs = result.data
-      error = result.error
+        .gte('date', period.start)
+        .lte('date', period.end)
+      
+      if (!error && txs) {
+        allTransactions = [...allTransactions, ...txs]
+      }
     }
 
-    if (error) {
-      throw error
-    }
-
-    const transactions = txs || []
+    const transactions = allTransactions
+    const actualMonthsAnalyzed = periods.length || monthsWindow
 
     // Regrouper les transactions par catégorie
     const txByCat: Record<string, number[]> = {}
@@ -150,7 +128,7 @@ export async function POST(request: Request) {
         continue
       }
       const val = amt < 0 ? Math.abs(amt) : amt
-      const rawCat: any = (t as any).category
+      const rawCat = t.category
       const name = (Array.isArray(rawCat) ? rawCat[0]?.name : rawCat?.name) || 'Non catégorisé'
       if (!txByCat[name]) txByCat[name] = []
       txByCat[name].push(val)
@@ -167,7 +145,7 @@ export async function POST(request: Request) {
 
     const budgets: Budget[] = Object.keys(txByCat).map(k => {
       const arr = txByCat[k]
-      const avg = arr.reduce((s, v) => s + v, 0) / Math.max(1, monthsWindow)
+      const avg = arr.reduce((s, v) => s + v, 0) / Math.max(1, actualMonthsAnalyzed)
       const med = median(arr)
       // Choisir la plus réaliste (médiane si > 0, sinon moyenne)
       const realistic = med > 0 ? med : avg
@@ -191,9 +169,9 @@ export async function POST(request: Request) {
     }
 
     // compute cap disponible: avgIncome per month minus savings
-    const avgIncomePerMonth = totalIncome / Math.max(1, monthsWindow)
+    const avgIncomePerMonth = totalIncome / Math.max(1, actualMonthsAnalyzed)
     // fallback: if no income, estimate from expenses * 1.2
-    const effectiveIncome = avgIncomePerMonth > 0 ? avgIncomePerMonth : (totalExpenses / Math.max(1, monthsWindow)) * 1.2
+    const effectiveIncome = avgIncomePerMonth > 0 ? avgIncomePerMonth : (totalExpenses / Math.max(1, actualMonthsAnalyzed)) * 1.2
     const savings = effectiveIncome * savingsRate
     const capDisponible = effectiveIncome - savings
 
@@ -245,8 +223,8 @@ export async function POST(request: Request) {
     }
 
     // Redistribution du reste uniquement sur Alimentation, Transport, Santé
-    let totalVars = variableBudgets.reduce((s, b) => s + b.recommendedMonthly, 0)
-    let resteVars = availableForVars - totalVars
+    const totalVars = variableBudgets.reduce((s, b) => s + b.recommendedMonthly, 0)
+    const resteVars = availableForVars - totalVars
     if (resteVars > 0) {
       const ESSENTIALS = ['alimentation', 'transport', 'santé']
       const essentials = variableBudgets.filter(b => ESSENTIALS.some(e => normalizeName(b.category).includes(e)))
@@ -262,7 +240,7 @@ export async function POST(request: Request) {
     }
 
     // Vérifier le plafond final
-    let totalRecommended = budgets.reduce((s, b) => s + b.recommendedMonthly, 0)
+    const totalRecommended = budgets.reduce((s, b) => s + b.recommendedMonthly, 0)
     if (totalRecommended > capDisponible + fixedTotal) {
       // Réduire proportionnellement uniquement les variables (jamais les fixes)
       const over = totalRecommended - (capDisponible + fixedTotal)
@@ -276,7 +254,17 @@ export async function POST(request: Request) {
     // Tri par montant total décroissant
     budgets.sort((a, b) => b.total - a.total)
 
-    return NextResponse.json({ budgets, meta: { monthsWindow, effectiveIncome, capDisponible, fixedTotal } })
+    return NextResponse.json({ 
+      budgets, 
+      meta: { 
+        monthsWindow, 
+        actualMonthsAnalyzed,
+        monthsAnalyzed: monthsToAnalyze,
+        effectiveIncome, 
+        capDisponible, 
+        fixedTotal 
+      } 
+    })
   } catch (err) {
     console.error('Error /api/previsionnel/algorithm POST:', err)
     return NextResponse.json({ error: 'Erreur interne' }, { status: 500 })
