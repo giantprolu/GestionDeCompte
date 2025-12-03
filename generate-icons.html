@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Generate Icons</title>
+</head>
+<body>
+  <canvas id="canvas192" width="192" height="192"></canvas>
+  <canvas id="canvas512" width="512" height="512"></canvas>
+  <script>
+    function drawIcon(canvas, size) {
+      const ctx = canvas.getContext('2d');
+      const scale = size / 192;
+      
+      // Background
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.roundRect(0, 0, size, size, 24 * scale);
+      ctx.fill();
+      
+      // Circle
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 8 * scale;
+      ctx.beginPath();
+      ctx.arc(size/2, size/2, 60 * scale, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      // Clock hands
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(size/2, 56 * scale);
+      ctx.lineTo(size/2, size/2);
+      ctx.lineTo(126 * scale, size/2);
+      ctx.stroke();
+      
+      // Center dot
+      ctx.fillStyle = '#10b981';
+      ctx.beginPath();
+      ctx.arc(size/2, size/2, 8 * scale, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Euro symbol
+      ctx.font = `bold ${24 * scale}px system-ui`;
+      ctx.textAlign = 'center';
+      ctx.fillText('€', size/2, 150 * scale);
+    }
+    
+    drawIcon(document.getElementById('canvas192'), 192);
+    drawIcon(document.getElementById('canvas512'), 512);
+    
+    // Download links
+    document.body.innerHTML += '<br><a id="dl192" download="icon-192x192.png">Download 192x192</a>';
+    document.body.innerHTML += '<br><a id="dl512" download="icon-512x512.png">Download 512x512</a>';
+    
+    document.getElementById('dl192').href = document.getElementById('canvas192').toDataURL('image/png');
+    document.getElementById('dl512').href = document.getElementById('canvas512').toDataURL('image/png');
+  </script>
+</body>
+</html>

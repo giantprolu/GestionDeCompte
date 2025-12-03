@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="24" fill="#0f172a"/>
+  <circle cx="96" cy="96" r="60" fill="none" stroke="#10b981" stroke-width="8"/>
+  <path d="M96 56 L96 96 L126 96" fill="none" stroke="#10b981" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="96" cy="96" r="8" fill="#10b981"/>
+  <text x="96" y="150" text-anchor="middle" fill="#10b981" font-size="24" font-weight="bold" font-family="system-ui">€</text>
+</svg>

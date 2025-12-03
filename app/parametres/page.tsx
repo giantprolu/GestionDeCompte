@@ -4,10 +4,11 @@ import { useState, useEffect } from 'react'
 import { useUser } from '@clerk/nextjs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Settings, Eye, Wallet, Check, ArrowLeft, Loader2 } from 'lucide-react'
+import { Settings, Eye, Wallet, Check, ArrowLeft, Loader2, Bell } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { useUserSettings } from '@/components/AppWrapper'
+import PushNotificationManager from '@/components/PushNotificationManager'
 
 export default function ParametresPage() {
   const { isSignedIn, isLoaded } = useUser()
@@ -223,6 +224,30 @@ export default function ParametresPage() {
                 : 'En passant en mode utilisateur complet, des comptes seront créés automatiquement si vous n\'en avez pas.'}
             </p>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Notifications */}
+      <Card className="bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Bell className="w-5 h-5 text-emerald-500" />
+            Notifications
+          </CardTitle>
+          <p className="text-sm text-slate-400">
+            Recevez des alertes pour vos échéances et rappels
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-white font-medium">Notifications push</p>
+              <p className="text-slate-400 text-sm">
+                Recevez des notifications même quand l&apos;app est fermée
+              </p>
+            </div>
+            <PushNotificationManager showLabel={false} />
+          </div>
         </CardContent>
       </Card>
     </div>
