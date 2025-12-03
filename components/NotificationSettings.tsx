@@ -40,6 +40,7 @@ export default function NotificationSettings() {
   const [isSaving, setIsSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [isTesting, setIsTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
 
   const loadPreferences = useCallback(async () => {
     try {
@@ -89,12 +90,71 @@ export default function NotificationSettings() {
 
   const testNotifications = async () => {
     setIsTesting(true)
+    setTestResult(null)
     try {
-      await fetch('/api/notifications/check')
+      const response = await fetch('/api/notifications/check')
+      const data = await response.json()
+      
+      if (!response.ok) {
+        setTestResult({ 
+          success: false, 
+          message: data.error || 'Erreur lors du test' 
+        })
+        return
+      }
+
+      // Analyser les résultats
+      const results = data.results || []
+      const sent = results.filter((r: { success: boolean }) => r.success)
+      const alreadySent = results.filter((r: { reason?: string }) => r.reason === 'already_sent')
+      
+      if (sent.length > 0) {
+        setTestResult({ 
+          success: true, 
+          message: `${sent.length} notification(s) envoyée(s) !` 
+        })
+      } else if (alreadySent.length > 0) {
+        setTestResult({ 
+          success: true, 
+          message: 'Notifications déjà envoyées aujourd\'hui' 
+        })
+      } else if (results.length === 0) {
+        setTestResult({ 
+          success: true, 
+          message: 'Aucune alerte à envoyer (vos comptes vont bien !)' 
+        })
+      } else {
+        // Vérifier les erreurs spécifiques
+        const noSubscription = results.some((r: { error?: string }) => r.error === 'No subscriptions found')
+        const vapidNotConfigured = results.some((r: { error?: string }) => r.error === 'VAPID not configured')
+        
+        if (noSubscription) {
+          setTestResult({ 
+            success: false, 
+            message: 'Activez d\'abord les notifications push ci-dessus' 
+          })
+        } else if (vapidNotConfigured) {
+          setTestResult({ 
+            success: false, 
+            message: 'Les notifications push ne sont pas configurées sur le serveur' 
+          })
+        } else {
+          setTestResult({ 
+            success: false, 
+            message: 'Erreur lors de l\'envoi des notifications' 
+          })
+        }
+      }
     } catch (error) {
       console.error('Error testing notifications:', error)
+      setTestResult({ 
+        success: false, 
+        message: 'Erreur de connexion au serveur' 
+      })
     } finally {
       setIsTesting(false)
+      // Effacer le message après 5 secondes
+      setTimeout(() => setTestResult(null), 5000)
     }
   }
 
@@ -281,6 +341,26 @@ export default function NotificationSettings() {
             )}
           </Button>
         </div>
+
+        {/* Résultat du test */}
+        {testResult && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`p-3 rounded-lg text-sm text-center ${
+              testResult.success 
+                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                : 'bg-red-500/20 text-red-400 border border-red-500/30'
+            }`}
+          >
+            {testResult.success ? (
+              <Check className="w-4 h-4 inline mr-2" />
+            ) : (
+              <AlertTriangle className="w-4 h-4 inline mr-2" />
+            )}
+            {testResult.message}
+          </motion.div>
+        )}
 
         <p className="text-xs text-slate-500 text-center mt-2">
           Les notifications sont envoyées une seule fois par jour pour chaque alerte
