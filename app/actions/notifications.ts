@@ -2,12 +2,16 @@
 
 import webpush, { PushSubscription as WebPushSubscription } from 'web-push'
 
-// Configure VAPID details
-webpush.setVapidDetails(
-  'mailto:contact@moneyflow.app',
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-)
+// Configure VAPID details only if environment variables are set
+const vapidConfigured = !!(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY)
+
+if (vapidConfigured) {
+  webpush.setVapidDetails(
+    'mailto:contact@moneyflow.app',
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+    process.env.VAPID_PRIVATE_KEY!
+  )
+}
 
 // In production, store subscriptions in database
 // For now, we'll use a simple in-memory store (resets on server restart)
@@ -50,6 +54,10 @@ export async function sendNotification(
     actions?: Array<{ action: string; title: string }>
   }
 ) {
+  if (!vapidConfigured) {
+    return { success: false, error: 'VAPID not configured' }
+  }
+
   const subscription = subscriptions.get(userId)
   
   if (!subscription) {
@@ -80,6 +88,10 @@ export async function sendNotificationToAll(notification: {
   icon?: string
   url?: string
 }) {
+  if (!vapidConfigured) {
+    return []
+  }
+
   const results = []
   
   for (const [userId, subscription] of subscriptions) {

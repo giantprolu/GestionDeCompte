@@ -4,11 +4,13 @@ import webpush, { PushSubscription as WebPushSubscription } from 'web-push'
 import { supabase } from '@/lib/db'
 
 // Configure VAPID details
-if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+const vapidConfigured = !!(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY)
+
+if (vapidConfigured) {
   webpush.setVapidDetails(
     'mailto:contact@moneyflow.app',
-    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
-    process.env.VAPID_PRIVATE_KEY
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+    process.env.VAPID_PRIVATE_KEY!
   )
 }
 
@@ -157,6 +159,10 @@ export async function sendPushNotification(
   notification: CriticalNotification
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    if (!vapidConfigured) {
+      return { success: false, error: 'VAPID not configured' }
+    }
+
     const subscriptions = await getUserSubscriptions(userId)
     
     if (subscriptions.length === 0) {
