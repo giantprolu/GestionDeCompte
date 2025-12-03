@@ -77,19 +77,21 @@ async function getAccountBalances(userId: string): Promise<AccountBalance[]> {
         .eq('account_id', account.id)
         .lte('date', now.toISOString())
 
-      let balance = account.initial_balance || 0
+      // Utiliser initial_balance (snake_case de la DB)
+      let balance = Number(account.initial_balance) || 0
       transactions?.forEach(txn => {
+        const amount = Number(txn.amount) || 0
         if (txn.type === 'income') {
-          balance += txn.amount
+          balance += amount
         } else if (txn.type === 'expense') {
-          balance -= txn.amount
+          balance -= amount
         }
       })
 
       balances.push({
         accountId: account.id,
         accountName: account.name,
-        balance,
+        balance: Math.round(balance * 100) / 100, // Arrondir à 2 décimales
       })
     }
 
@@ -116,9 +118,13 @@ async function getUpcomingRecurringTransactions(userId: string, daysAhead: numbe
 
     const accountIds = accounts.map(a => a.id)
 
+    // Inclure la catégorie pour avoir un nom si la note est vide
     const { data: transactions, error } = await supabase
       .from('transactions')
-      .select('*')
+      .select(`
+        *,
+        category:categories(name)
+      `)
       .in('account_id', accountIds)
       .eq('is_recurring', true)
       .gte('date', now.toISOString().split('T')[0])
@@ -126,13 +132,19 @@ async function getUpcomingRecurringTransactions(userId: string, daysAhead: numbe
 
     if (error) throw error
 
-    return (transactions || []).map(txn => ({
-      id: txn.id,
-      name: txn.description,
-      amount: txn.amount,
-      date: new Date(txn.date),
-      daysUntil: Math.ceil((new Date(txn.date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
-    }))
+    return (transactions || []).map(txn => {
+      // Utiliser note, sinon le nom de la catégorie, sinon un texte par défaut
+      const categoryName = (txn.category as { name?: string } | null)?.name
+      const name = txn.note || categoryName || 'Transaction récurrente'
+      
+      return {
+        id: txn.id,
+        name,
+        amount: Number(txn.amount) || 0,
+        date: new Date(txn.date),
+        daysUntil: Math.ceil((new Date(txn.date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+      }
+    })
   } catch (error) {
     console.error('Error getting recurring transactions:', error)
     return []
