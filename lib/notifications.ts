@@ -402,3 +402,81 @@ export async function notifyMonthlySummary(
 
   return result
 }
+
+// ============================================
+// FONCTIONS DE TEST (sans vérification "déjà envoyé")
+// ============================================
+
+// Test forcé: Solde négatif
+export async function forceNotifyNegativeBalance(
+  userId: string,
+  accountName: string,
+  balance: number
+) {
+  const notification: CriticalNotification = {
+    type: 'negative_balance',
+    title: `${NOTIFICATION_ICONS.negative_balance} Solde Négatif !`,
+    body: `Votre compte "${accountName}" est passé à ${balance.toFixed(2)} €. Attention aux frais bancaires !`,
+    icon: '/icon-192x192.png',
+    tag: `test_negative_balance`,
+    url: '/comptes',
+    data: { type: 'negative_balance', test: true }
+  }
+  return await sendPushNotification(userId, notification)
+}
+
+// Test forcé: Solde bas
+export async function forceNotifyLowBalance(
+  userId: string,
+  accountName: string,
+  balance: number,
+  threshold: number
+) {
+  const notification: CriticalNotification = {
+    type: 'low_balance',
+    title: `${NOTIFICATION_ICONS.low_balance} Solde Bas`,
+    body: `Votre compte "${accountName}" n'a plus que ${balance.toFixed(2)} € (seuil: ${threshold} €)`,
+    icon: '/icon-192x192.png',
+    tag: `test_low_balance`,
+    url: '/comptes',
+    data: { type: 'low_balance', test: true }
+  }
+  return await sendPushNotification(userId, notification)
+}
+
+// Test forcé: Prélèvement récurrent
+export async function forceNotifyUpcomingRecurring(
+  userId: string,
+  transactionName: string,
+  amount: number,
+  daysUntil: number
+) {
+  const dayText = daysUntil === 0 ? "aujourd'hui" : 
+                  daysUntil === 1 ? "demain" : 
+                  `dans ${daysUntil} jours`
+
+  const notification: CriticalNotification = {
+    type: 'recurring_due',
+    title: `${NOTIFICATION_ICONS.recurring_due} Prélèvement ${dayText}`,
+    body: `"${transactionName}" de ${amount.toFixed(2)} € sera débité ${dayText}`,
+    icon: '/icon-192x192.png',
+    tag: `test_recurring`,
+    url: '/transactions',
+    data: { type: 'recurring_due', test: true }
+  }
+  return await sendPushNotification(userId, notification)
+}
+
+// Test forcé: Notification de test simple
+export async function sendTestNotification(userId: string) {
+  const notification: CriticalNotification = {
+    type: 'monthly_summary',
+    title: `🧪 Test de Notification`,
+    body: `Si vous voyez ceci, les notifications fonctionnent correctement !`,
+    icon: '/icon-192x192.png',
+    tag: `test_notification`,
+    url: '/',
+    data: { type: 'test', test: true }
+  }
+  return await sendPushNotification(userId, notification)
+}

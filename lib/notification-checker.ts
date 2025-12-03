@@ -6,6 +6,10 @@ import {
   notifyLowBalance,
   notifyUpcomingRecurring,
   notifyCreditDue,
+  forceNotifyNegativeBalance,
+  forceNotifyLowBalance,
+  forceNotifyUpcomingRecurring,
+  sendTestNotification,
 } from '@/lib/notifications'
 
 interface AccountBalance {
@@ -309,5 +313,75 @@ export async function checkAccountNotifications(userId: string, accountId: strin
   } catch (error) {
     console.error('Error checking account notifications:', error)
     return { success: false, error: 'Failed to check account' }
+  }
+}
+
+// ============================================
+// FONCTION DE TEST FORCÉ
+// ============================================
+
+// Force l'envoi de notifications de test (ignore les vérifications "déjà envoyé")
+export async function forceTestNotifications(userId: string) {
+  const results: Array<{ type: string; success: boolean; error?: string; accountName?: string }> = []
+
+  try {
+    // Récupérer les préférences de l'utilisateur
+    const prefs = await getUserNotificationPreferences(userId)
+
+    // 1. Vérifier les soldes des comptes
+    const balances = await getAccountBalances(userId)
+    
+    let notificationSent = false
+
+    for (const account of balances) {
+      // Notification solde négatif (forcée)
+      if (prefs.negative_balance && account.balance < 0) {
+        const result = await forceNotifyNegativeBalance(
+          userId,
+          account.accountName,
+          account.balance
+        )
+        results.push({ type: 'negative_balance', accountName: account.accountName, ...result })
+        if (result.success) notificationSent = true
+      }
+      // Notification solde bas (forcée)
+      else if (prefs.low_balance && account.balance >= 0 && account.balance < prefs.low_balance_threshold) {
+        const result = await forceNotifyLowBalance(
+          userId,
+          account.accountName,
+          account.balance,
+          prefs.low_balance_threshold
+        )
+        results.push({ type: 'low_balance', accountName: account.accountName, ...result })
+        if (result.success) notificationSent = true
+      }
+    }
+
+    // 2. Vérifier les transactions récurrentes à venir (forcées)
+    if (prefs.upcoming_recurring) {
+      const recurringTransactions = await getUpcomingRecurringTransactions(userId)
+      
+      for (const txn of recurringTransactions) {
+        const result = await forceNotifyUpcomingRecurring(
+          userId,
+          txn.name,
+          txn.amount,
+          txn.daysUntil
+        )
+        results.push({ type: 'recurring_due', ...result })
+        if (result.success) notificationSent = true
+      }
+    }
+
+    // 3. Si aucune notification n'a été envoyée, envoyer une notification de test
+    if (!notificationSent) {
+      const testResult = await sendTestNotification(userId)
+      results.push({ type: 'test', ...testResult })
+    }
+
+    return { success: true, results, forced: true }
+  } catch (error) {
+    console.error('Error in force test notifications:', error)
+    return { success: false, error: 'Failed to test notifications', results }
   }
 }

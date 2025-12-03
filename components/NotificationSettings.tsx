@@ -92,7 +92,8 @@ export default function NotificationSettings() {
     setIsTesting(true)
     setTestResult(null)
     try {
-      const response = await fetch('/api/notifications/check')
+      // Utiliser force=true pour toujours envoyer une notification
+      const response = await fetch('/api/notifications/check?force=true')
       const data = await response.json()
       
       if (!response.ok) {
