@@ -1,0 +1,16 @@
+<component name="libraryTable">
+  <library name="Gradle: androidx.webkit:webkit:1.12.1@aar" external-system-id="GRADLE">
+    <ANNOTATIONS>
+      <root url="jar://$USER_HOME$/.gradle/caches/8.11.1/transforms/3fbbd497413c0ee4069f169f4dc7a260/transformed/webkit-1.12.1/annotations.zip!/" />
+    </ANNOTATIONS>
+    <CLASSES>
+      <root url="jar://$USER_HOME$/.gradle/caches/8.11.1/transforms/3fbbd497413c0ee4069f169f4dc7a260/transformed/webkit-1.12.1/jars/classes.jar!/" />
+      <root url="file://$USER_HOME$/.gradle/caches/8.11.1/transforms/3fbbd497413c0ee4069f169f4dc7a260/transformed/webkit-1.12.1/res" />
+      <root url="file://$USER_HOME$/.gradle/caches/8.11.1/transforms/3fbbd497413c0ee4069f169f4dc7a260/transformed/webkit-1.12.1/AndroidManifest.xml" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/androidx.webkit/webkit/1.12.1/82c0dce697d9152d55ff84f29acb18588c13e534/webkit-1.12.1-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>
