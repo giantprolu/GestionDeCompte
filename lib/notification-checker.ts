@@ -61,41 +61,55 @@ async function getUserNotificationPreferences(userId: string): Promise<Notificat
 }
 
 // Calculer les soldes des comptes d'un utilisateur
+// Utilise la même logique que l'API /api/accounts
 async function getAccountBalances(userId: string): Promise<AccountBalance[]> {
   try {
+    // Récupérer les comptes de l'utilisateur
     const { data: accounts, error: accountError } = await supabase
       .from('accounts')
-      .select('*')
+      .select('id, name, initial_balance')
       .eq('user_id', userId)
 
-    if (accountError || !accounts) return []
+    if (accountError || !accounts) {
+      console.error('Error fetching accounts:', accountError)
+      return []
+    }
 
     const balances: AccountBalance[] = []
     const now = new Date()
     now.setHours(23, 59, 59, 999)
 
     for (const account of accounts) {
-      const { data: transactions } = await supabase
+      // Récupérer les transactions pour ce compte
+      const { data: transactions, error: txError } = await supabase
         .from('transactions')
         .select('amount, type')
         .eq('account_id', account.id)
         .lte('date', now.toISOString())
 
-      // Utiliser initial_balance (snake_case de la DB)
-      let balance = Number(account.initial_balance) || 0
-      transactions?.forEach(txn => {
-        const amount = Number(txn.amount) || 0
-        if (txn.type === 'income') {
-          balance += amount
-        } else if (txn.type === 'expense') {
-          balance -= amount
+      if (txError) {
+        console.error('Error fetching transactions:', txError)
+        continue
+      }
+
+      // Calculer le solde : initial + revenus - dépenses
+      // Note: initial_balance vient directement de la DB, pas besoin de Number()
+      let balance = account.initial_balance || 0
+      
+      if (transactions) {
+        for (const txn of transactions) {
+          if (txn.type === 'income') {
+            balance += txn.amount
+          } else if (txn.type === 'expense') {
+            balance -= txn.amount
+          }
         }
-      })
+      }
 
       balances.push({
         accountId: account.id,
         accountName: account.name,
-        balance: Math.round(balance * 100) / 100, // Arrondir à 2 décimales
+        balance: Math.round(balance * 100) / 100,
       })
     }
 
