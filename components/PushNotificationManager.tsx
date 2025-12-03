@@ -40,32 +40,32 @@ export default function PushNotificationManager({
       const sub = await registration.pushManager.getSubscription()
       setSubscription(sub)
     } catch (error) {
-      console.error('Service worker registration failed:', error)
+    console.error('Service worker registration failed:', error)
     }
-  }, [])
+}, [])
 
-  useEffect(() => {
+useEffect(() => {
     // Use requestAnimationFrame to defer state updates
     requestAnimationFrame(() => {
-      const supported = 'serviceWorker' in navigator && 'PushManager' in window
-      setIsSupported(supported)
-      if (supported) {
+    const supported = 'serviceWorker' in navigator && 'PushManager' in window
+    setIsSupported(supported)
+    if (supported) {
         setPermission(Notification.permission)
         registerServiceWorker()
-      }
+    }
     })
-  }, [registerServiceWorker])
+}, [registerServiceWorker])
 
-  const subscribeToPush = async () => {
+const subscribeToPush = async () => {
     if (!user) return
     
     setIsLoading(true)
     try {
       // Request permission
-      const permission = await Notification.requestPermission()
-      setPermission(permission)
-      
-      if (permission !== 'granted') {
+    const permission = await Notification.requestPermission()
+    setPermission(permission)
+    
+    if (permission !== 'granted') {
         setIsLoading(false)
         return
       }
@@ -133,9 +133,16 @@ export default function PushNotificationManager({
 
   return (
     <Button
-      variant={subscription ? 'outline' : 'default'}
+      variant="ghost"
       size={showLabel ? 'default' : 'icon'}
-      className={className}
+      className={`
+        transition-all duration-300 
+        ${subscription 
+          ? 'bg-green-600 hover:bg-green-700 text-white border-green-500' 
+          : 'bg-slate-700 hover:bg-slate-600 text-slate-300 border-slate-600'
+        }
+        ${className}
+      `}
       onClick={subscription ? unsubscribeFromPush : subscribeToPush}
       disabled={isLoading}
     >
@@ -143,12 +150,12 @@ export default function PushNotificationManager({
         <Loader2 className="h-4 w-4 animate-spin" />
       ) : subscription ? (
         <>
-          <BellOff className="h-4 w-4" />
-          {showLabel && <span className="ml-2">Désactiver les notifications</span>}
+          <Bell className="h-4 w-4" />
+          {showLabel && <span className="ml-2">Notifications activées</span>}
         </>
       ) : (
         <>
-          <Bell className="h-4 w-4" />
+          <BellOff className="h-4 w-4" />
           {showLabel && <span className="ml-2">Activer les notifications</span>}
         </>
       )}
