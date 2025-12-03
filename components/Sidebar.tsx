@@ -127,9 +127,9 @@ export default function Sidebar({ children }: SidebarProps) {
         </div>
       </aside>
 
-      {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 glass border-b border-white/10 px-4 py-3 backdrop-blur-xl">
-        <div className="flex items-center justify-between">
+      {/* Mobile Header - avec support Dynamic Island et notch */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 glass border-b border-white/10 px-4 backdrop-blur-xl mobile-header safe-left safe-right">
+        <div className="flex items-center justify-between py-3">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-blue-600 flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-white" />
@@ -160,9 +160,9 @@ export default function Sidebar({ children }: SidebarProps) {
         </div>
       </div>
 
-      {/* Bottom Navigation Mobile */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 glass border-t border-white/10 backdrop-blur-xl">
-        <div className="flex items-center justify-around px-4 py-3">
+      {/* Bottom Navigation Mobile - avec support safe area Android/iOS */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 glass border-t border-white/10 backdrop-blur-xl mobile-nav safe-left safe-right">
+        <div className="flex items-center justify-around px-4 pt-2 pb-1">
           {filteredNavItems.map((item) => {
             const Icon = item.icon
             const isActive = pathname === item.href
@@ -186,7 +186,7 @@ export default function Sidebar({ children }: SidebarProps) {
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
-        <div className="p-4 lg:p-8 pt-20 lg:pt-8 pb-24 lg:pb-8">
+        <div className="p-4 lg:p-8 lg:pt-8 lg:pb-8 mobile-content lg:!pt-8 lg:!pb-8">
           {children}
         </div>
       </main>
