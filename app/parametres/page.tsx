@@ -4,11 +4,12 @@ import { useState, useEffect } from 'react'
 import { useUser } from '@clerk/nextjs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Settings, Eye, Wallet, Check, ArrowLeft, Loader2, Bell } from 'lucide-react'
+import { Settings, Eye, Wallet, Check, ArrowLeft, Loader2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { useUserSettings } from '@/components/AppWrapper'
 import PushNotificationManager from '@/components/PushNotificationManager'
+import NotificationSettings from '@/components/NotificationSettings'
 
 export default function ParametresPage() {
   const { isSignedIn, isLoaded } = useUser()
@@ -227,29 +228,29 @@ export default function ParametresPage() {
         </CardContent>
       </Card>
 
-      {/* Notifications */}
+      {/* Activation des notifications */}
       <Card className="bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700">
         <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Bell className="w-5 h-5 text-emerald-500" />
-            Notifications
-          </CardTitle>
+          <CardTitle className="text-lg">Notifications push</CardTitle>
           <p className="text-sm text-slate-400">
-            Recevez des alertes pour vos échéances et rappels
+            Activez les notifications pour recevoir des alertes importantes
           </p>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-white font-medium">Notifications push</p>
+              <p className="text-white font-medium">Activer les notifications</p>
               <p className="text-slate-400 text-sm">
-                Recevez des notifications même quand l&apos;app est fermée
+                Recevez des alertes même quand l&apos;app est fermée
               </p>
             </div>
             <PushNotificationManager showLabel={false} />
           </div>
         </CardContent>
       </Card>
+
+      {/* Paramètres détaillés des notifications */}
+      <NotificationSettings />
     </div>
   )
 }

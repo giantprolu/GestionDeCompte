@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/db'
 import { auth } from '@clerk/nextjs/server'
+import { checkAccountNotifications } from '@/lib/notification-checker'
 
 export async function GET(request: Request) {
   try {
@@ -179,6 +180,10 @@ export async function POST(request: Request) {
       createdAt: transaction.created_at,
       updatedAt: transaction.updated_at,
     }
+
+    // Vérifier les notifications critiques après la transaction (notamment solde négatif)
+    // Exécuter en arrière-plan pour ne pas ralentir la réponse
+    checkAccountNotifications(userId, body.accountId).catch(console.error)
 
     return NextResponse.json(mappedTransaction)
   } catch (error) {

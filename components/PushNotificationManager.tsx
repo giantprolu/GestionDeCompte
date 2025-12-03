@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useUser } from '@clerk/nextjs'
-import { subscribeUser, unsubscribeUser } from '@/app/actions/notifications'
 import { Button } from '@/components/ui/button'
 import { Bell, BellOff, Loader2 } from 'lucide-react'
 
@@ -80,8 +79,17 @@ export default function PushNotificationManager({
       })
       
       setSubscription(sub)
+      
+      // Sauvegarder via l'API (qui stocke en base de données)
       const serializedSub = JSON.parse(JSON.stringify(sub))
-      await subscribeUser(serializedSub, user.id)
+      await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(serializedSub),
+      })
+
+      // Vérifier immédiatement les notifications critiques
+      await fetch('/api/notifications/check')
     } catch (error) {
       console.error('Error subscribing to push:', error)
     }
@@ -94,8 +102,15 @@ export default function PushNotificationManager({
     setIsLoading(true)
     try {
       await subscription.unsubscribe()
+      
+      // Supprimer via l'API
+      await fetch('/api/notifications', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ endpoint: subscription.endpoint }),
+      })
+      
       setSubscription(null)
-      await unsubscribeUser(user.id)
     } catch (error) {
       console.error('Error unsubscribing from push:', error)
     }
