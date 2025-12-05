@@ -1,83 +1,144 @@
-const CACHE_NAME = 'moneyflow-v1';
+const CACHE_NAME = 'moneyflow-v2';
+const STATIC_CACHE_NAME = 'moneyflow-static-v2';
 
-// Assets to cache for offline use
-const urlsToCache = [
-  '/',
-  '/comptes',
-  '/depenses',
-  '/previsionnel',
-  '/transactions',
-  '/parametres',
-  '/partage',
+// Only cache truly static assets, NOT HTML pages
+const staticAssets = [
+  '/icon-192x192.png',
+  '/icon-512x512.png',
 ];
 
-// Install event - cache assets
+// Install event - cache only static assets
 self.addEventListener('install', (event) => {
+  console.log('[SW] Installing...');
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('Opened cache');
-      return cache.addAll(urlsToCache);
+    caches.open(STATIC_CACHE_NAME).then((cache) => {
+      console.log('[SW] Caching static assets');
+      return cache.addAll(staticAssets);
     })
   );
+  // Skip waiting to activate immediately
   self.skipWaiting();
 });
 
-// Activate event - clean up old caches
+// Activate event - clean up ALL old caches
 self.addEventListener('activate', (event) => {
+  console.log('[SW] Activating...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('Deleting old cache:', cacheName);
+          // Delete any cache that doesn't match current versions
+          if (cacheName !== CACHE_NAME && cacheName !== STATIC_CACHE_NAME) {
+            console.log('[SW] Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
+    }).then(() => {
+      console.log('[SW] Claiming clients');
+      return self.clients.claim();
     })
   );
-  self.clients.claim();
 });
 
-// Fetch event - serve from cache, fallback to network
+// Fetch event - Network First strategy for HTML, Cache First for static assets
 self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+  
   // Skip non-GET requests
   if (event.request.method !== 'GET') {
     return;
   }
 
   // Skip API requests - always fetch from network
-  if (event.request.url.includes('/api/')) {
+  if (url.pathname.startsWith('/api/')) {
     return;
   }
 
-  event.respondWith(
-    caches.match(event.request).then((response) => {
-      // Return cached version or fetch from network
-      if (response) {
-        return response;
-      }
+  // Skip external requests (Clerk, Supabase, etc.)
+  if (url.origin !== self.location.origin) {
+    return;
+  }
 
-      return fetch(event.request).then((response) => {
-        // Don't cache non-successful responses
-        if (!response || response.status !== 200 || response.type !== 'basic') {
+  // Skip clerk-related requests
+  if (url.href.includes('clerk') || 
+      url.href.includes('.clerk.') ||
+      url.href.includes('accounts.dev')) {
+    return;
+  }
+
+  // Skip Next.js internal requests that shouldn't be cached
+  if (url.pathname.startsWith('/_next/webpack-hmr') ||
+      url.pathname.includes('__nextjs') ||
+      url.pathname.includes('turbopack')) {
+    return;
+  }
+
+  // For HTML pages (navigation requests) - ALWAYS Network First
+  if (event.request.mode === 'navigate' || 
+      event.request.headers.get('accept')?.includes('text/html')) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          // Don't cache HTML responses - always get fresh
           return response;
+        })
+        .catch(() => {
+          // Only on network failure, try to return a basic offline message
+          return new Response(
+            '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Hors ligne</title></head><body style="font-family: sans-serif; text-align: center; padding: 50px;"><h1>Vous êtes hors ligne</h1><p>Veuillez vérifier votre connexion internet.</p><button onclick="location.reload()">Réessayer</button></body></html>',
+            { headers: { 'Content-Type': 'text/html' } }
+          );
+        })
+    );
+    return;
+  }
+
+  // For static assets (images, fonts, etc.) - Cache First
+  if (url.pathname.match(/\.(png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$/)) {
+    event.respondWith(
+      caches.match(event.request).then((cachedResponse) => {
+        if (cachedResponse) {
+          return cachedResponse;
         }
-
-        // Clone the response
-        const responseToCache = response.clone();
-
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
+        return fetch(event.request).then((response) => {
+          if (response && response.status === 200) {
+            const responseToCache = response.clone();
+            caches.open(STATIC_CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          }
+          return response;
         });
+      })
+    );
+    return;
+  }
 
-        return response;
-      });
-    }).catch(() => {
-      // Return offline page if available
-      return caches.match('/');
-    })
-  );
+  // For JS/CSS chunks - Network First with short-lived cache
+  if (url.pathname.startsWith('/_next/static/')) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          // Cache successful responses for offline use
+          if (response && response.status === 200) {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          }
+          return response;
+        })
+        .catch(() => {
+          // Try cache on network failure
+          return caches.match(event.request);
+        })
+    );
+    return;
+  }
+
+  // Default: Network only, no caching
+  event.respondWith(fetch(event.request));
 });
 
 // Push notification event
@@ -104,7 +165,7 @@ self.addEventListener('push', (event) => {
 
 // Notification click event
 self.addEventListener('notificationclick', (event) => {
-  console.log('Notification click received.');
+  console.log('[SW] Notification click received.');
   event.notification.close();
 
   const urlToOpen = event.notification.data?.url || '/';
@@ -124,4 +185,20 @@ self.addEventListener('notificationclick', (event) => {
       }
     })
   );
+});
+
+// Handle messages from the main thread
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+  if (event.data && event.data.type === 'CLEAR_CACHE') {
+    event.waitUntil(
+      caches.keys().then((cacheNames) => {
+        return Promise.all(
+          cacheNames.map((cacheName) => caches.delete(cacheName))
+        );
+      })
+    );
+  }
 });

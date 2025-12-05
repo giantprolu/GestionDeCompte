@@ -25,11 +25,27 @@ export default function PushNotificationManager({
   showLabel = true,
   className = ''
 }: PushNotificationManagerProps) {
-  const { user } = useUser()
+  const { user, isLoaded } = useUser()
   const [subscription, setSubscription] = useState<PushSubscription | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [permission, setPermission] = useState<NotificationPermission>('default')
   const [isSupported, setIsSupported] = useState<boolean | null>(null)
+  const [hasServerSubscription, setHasServerSubscription] = useState(false)
+
+  // Vérifier si l'utilisateur a une subscription en base de données
+  const checkServerSubscription = useCallback(async () => {
+    if (!user) return false
+    try {
+      const response = await fetch('/api/notifications/subscription-status')
+      if (response.ok) {
+        const data = await response.json()
+        return data.hasSubscription
+      }
+    } catch (error) {
+      console.error('Error checking server subscription:', error)
+    }
+    return false
+  }, [user])
 
   const registerServiceWorker = useCallback(async () => {
     try {
@@ -37,35 +53,83 @@ export default function PushNotificationManager({
         scope: '/',
         updateViaCache: 'none',
       })
+      
+      // Vérifier s'il y a une mise à jour du SW
+      registration.addEventListener('updatefound', () => {
+        const newWorker = registration.installing
+        if (newWorker) {
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'activated') {
+              // Rafraîchir la page si un nouveau SW est activé
+              window.location.reload()
+            }
+          })
+        }
+      })
+
       const sub = await registration.pushManager.getSubscription()
       setSubscription(sub)
+      return sub
     } catch (error) {
-    console.error('Service worker registration failed:', error)
+      console.error('Service worker registration failed:', error)
+      return null
     }
-}, [])
+  }, [])
 
-useEffect(() => {
-    // Use requestAnimationFrame to defer state updates
-    requestAnimationFrame(() => {
-    const supported = 'serviceWorker' in navigator && 'PushManager' in window
-    setIsSupported(supported)
-    if (supported) {
-        setPermission(Notification.permission)
-        registerServiceWorker()
+  useEffect(() => {
+    const init = async () => {
+      const supported = 'serviceWorker' in navigator && 'PushManager' in window
+      setIsSupported(supported)
+      
+      if (!supported) {
+        setIsLoading(false)
+        return
+      }
+      
+      setPermission(Notification.permission)
+      const sub = await registerServiceWorker()
+      
+      // Vérifier aussi en base de données
+      if (isLoaded && user) {
+        const hasServer = await checkServerSubscription()
+        setHasServerSubscription(hasServer)
+        
+        // Si on a une subscription serveur mais pas locale, essayer de restaurer
+        if (hasServer && !sub && Notification.permission === 'granted') {
+          // Réinscrire silencieusement
+          try {
+            const registration = await navigator.serviceWorker.ready
+            const newSub = await registration.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: urlBase64ToUint8Array(
+                process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
+              ),
+            })
+            setSubscription(newSub)
+          } catch (e) {
+            console.error('Failed to restore subscription:', e)
+          }
+        }
+      }
+      
+      setIsLoading(false)
     }
-    })
-}, [registerServiceWorker])
+    
+    if (isLoaded) {
+      init()
+    }
+  }, [registerServiceWorker, checkServerSubscription, isLoaded, user])
 
-const subscribeToPush = async () => {
+  const subscribeToPush = async () => {
     if (!user) return
     
     setIsLoading(true)
     try {
       // Request permission
-    const permission = await Notification.requestPermission()
-    setPermission(permission)
+      const permission = await Notification.requestPermission()
+      setPermission(permission)
     
-    if (permission !== 'granted') {
+      if (permission !== 'granted') {
         setIsLoading(false)
         return
       }
@@ -87,6 +151,8 @@ const subscribeToPush = async () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(serializedSub),
       })
+      
+      setHasServerSubscription(true)
 
       // Vérifier immédiatement les notifications critiques
       await fetch('/api/notifications/check')
@@ -111,6 +177,7 @@ const subscribeToPush = async () => {
       })
       
       setSubscription(null)
+      setHasServerSubscription(false)
     } catch (error) {
       console.error('Error unsubscribing from push:', error)
     }
@@ -118,7 +185,7 @@ const subscribeToPush = async () => {
   }
 
   // Don't render until we know if supported
-  if (isSupported === null || !isSupported) {
+  if (isSupported === null || !isSupported || !isLoaded) {
     return null
   }
 
@@ -131,24 +198,26 @@ const subscribeToPush = async () => {
     )
   }
 
+  const isActive = subscription !== null || hasServerSubscription
+
   return (
     <Button
       variant="ghost"
       size={showLabel ? 'default' : 'icon'}
       className={`
         transition-all duration-300 
-        ${subscription 
+        ${isActive 
           ? 'bg-green-600 hover:bg-green-700 text-white border-green-500' 
           : 'bg-slate-700 hover:bg-slate-600 text-slate-300 border-slate-600'
         }
         ${className}
       `}
-      onClick={subscription ? unsubscribeFromPush : subscribeToPush}
+      onClick={isActive ? unsubscribeFromPush : subscribeToPush}
       disabled={isLoading}
     >
       {isLoading ? (
         <Loader2 className="h-4 w-4 animate-spin" />
-      ) : subscription ? (
+      ) : isActive ? (
         <>
           <Bell className="h-4 w-4" />
           {showLabel && <span className="ml-2">Notifications activées</span>}

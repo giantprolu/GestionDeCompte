@@ -36,62 +36,7 @@ export default function AppWrapper({ children }: Props) {
   const [userType, setUserType] = useState<UserType>(null)
   const [isLoadingSettings, setIsLoadingSettings] = useState(true)
 
-  const initializeAccounts = async () => {
-    const response = await fetch('/api/accounts')
-    
-    if (!response.ok) {
-      throw new Error('Erreur lors de la récupération des comptes')
-    }
-    
-    const accounts = await response.json()
-
-    if (accounts.length === 0) {
-      const boursoRes = await fetch('/api/accounts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: 'Bourso',
-          type: 'ponctuel',
-          initialBalance: 0,
-        }),
-      })
-
-      if (!boursoRes.ok) {
-        const errorData = await boursoRes.json()
-        throw new Error(`Erreur Bourso: ${errorData.error}`)
-      }
-
-      const caisseRes = await fetch('/api/accounts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: 'Caisse EP',
-          type: 'obligatoire',
-          initialBalance: 0,
-        }),
-      })
-
-      if (!caisseRes.ok) {
-        const errorData = await caisseRes.json()
-        throw new Error(`Erreur Caisse EP: ${errorData.error}`)
-      }
-
-      const carteRes = await fetch('/api/accounts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: 'Carte Restaurant',
-          type: 'ponctuel',
-          initialBalance: 0,
-        }),
-      })
-
-      if (!carteRes.ok) {
-        const errorData = await carteRes.json()
-        throw new Error(`Erreur Carte Restaurant: ${errorData.error}`)
-      }
-    }
-  }
+  // Plus de création automatique de comptes - l'utilisateur doit les créer manuellement
 
   useEffect(() => {
     if (!isLoaded || !user || status !== 'idle') return
@@ -126,9 +71,8 @@ export default function AppWrapper({ children }: Props) {
           }
         }
 
-        // 2. Pour les utilisateurs complets, initialiser les comptes si nécessaire
-        await initializeAccounts()
-        
+        // 2. Pour les utilisateurs complets, pas de création de comptes automatique
+        // L'utilisateur devra créer ses comptes manuellement
         setStatus('done')
         setIsLoadingSettings(false)
       } catch (error) {
@@ -145,23 +89,14 @@ export default function AppWrapper({ children }: Props) {
   const handleUserTypeSelect = async (type: 'viewer' | 'user') => {
     setUserType(type)
     setShowUserTypeModal(false)
+    setStatus('done')
     
     if (type === 'viewer') {
-      // Visionneur - pas de comptes à créer, rediriger vers /partage
-      setStatus('done')
+      // Visionneur - rediriger vers /partage
       router.push('/partage')
-    } else {
-      // Utilisateur complet - initialiser les comptes
-      setStatus('loading')
-      try {
-        await initializeAccounts()
-        setStatus('done')
-      } catch (error) {
-        console.error('❌ Erreur lors de l\'initialisation:', error)
-        setError(error instanceof Error ? error.message : 'Erreur inconnue')
-        setStatus('error')
-      }
     }
+    // Utilisateur complet - pas de création de comptes automatique
+    // Il devra créer ses comptes manuellement dans /comptes
   }
 
   // Modal de choix du type d'utilisateur

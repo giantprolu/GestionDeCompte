@@ -136,11 +136,29 @@ export default function Home() {
 
   useEffect(() => {
     if (isLoaded && isSignedIn) {
-      fetchData()
+      // Traiter les transactions récurrentes du jour au chargement
+      processRecurringTransactions().then(() => {
+        fetchData()
+      })
     } else if (isLoaded && !isSignedIn) {
       setLoading(false)
     }
   }, [isLoaded, isSignedIn])
+
+  // Traiter les transactions récurrentes dont la date est arrivée
+  const processRecurringTransactions = async () => {
+    try {
+      const res = await fetch('/api/process-recurring', { method: 'POST' })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.processed > 0) {
+          console.log(`${data.processed} transaction(s) récurrente(s) traitée(s)`)
+        }
+      }
+    } catch (error) {
+      console.error('Erreur traitement récurrences:', error)
+    }
+  }
 
   const fetchData = async () => {
     try {
@@ -173,10 +191,6 @@ export default function Home() {
   }
 
   // Calculer le solde courant d'un compte en appliquant ses transactions
-  // Utiliser le nom du compte pour éviter les confusions (Bourso vs Carte Restaurant)
-  const boursoAccount = accounts.find(acc => acc.name.toLowerCase().includes('bourso') && acc.isOwner !== false)
-  const caisseAccount = accounts.find(acc => (acc.name.toLowerCase().includes('caisse') || acc.type === 'obligatoire') && acc.isOwner !== false)
-
   // Calculer le total uniquement des comptes propres (pas les partagés)
   const ownAccounts = accounts.filter(acc => acc.isOwner !== false)
   const totalBalance = sumBalances(ownAccounts, transactions, null, { useCurrent: false, onlyOwn: true })
@@ -204,70 +218,99 @@ export default function Home() {
 
   return (
     <div className="space-y-6 md:space-y-8 pb-20 md:pb-8">
-      {/* Sélecteur de période modernisé */}
+      {/* Sélecteur de période amélioré */}
       <motion.div 
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         className="relative"
       >
-        <div className="flex items-center gap-3 mb-3">
-          <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/30">
-            <Calendar className="w-4 h-4 text-blue-400" />
-          </div>
-          <span className="text-sm font-medium text-slate-300">Période</span>
-        </div>
-        
-        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent">
-          {allMonths.map((month, idx) => {
-            const isSelected = month === selectedMonth
-            const isCurrent = month === currentMonth
-            const monthDate = new Date(month + '-01')
-            const monthName = monthDate.toLocaleString('fr-FR', { month: 'short' })
-            const year = monthDate.getFullYear()
+        <Card className="border-slate-700/50 bg-gradient-to-br from-slate-800/80 to-slate-900/80 shadow-lg overflow-hidden">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/30">
+                  <Calendar className="w-5 h-5 text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Période</h3>
+                  <p className="text-xs text-slate-400">
+                    {isCurrentMonth ? 'Mois en cours' : 'Données archivées'}
+                  </p>
+                </div>
+              </div>
+              {!isCurrentMonth && (
+                <motion.button
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  onClick={() => toggleMonth(currentMonth)}
+                  className="px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-300 text-xs font-medium border border-blue-500/30 hover:bg-blue-500/30 transition-colors"
+                >
+                  ← Revenir au mois actuel
+                </motion.button>
+              )}
+            </div>
             
-            return (
-              <motion.button
-                key={month}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: idx * 0.03 }}
-                onClick={() => toggleMonth(month)}
-                className={`relative flex flex-col items-center min-w-[70px] px-4 py-2.5 rounded-xl transition-all duration-200 ${
-                  isSelected 
-                    ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-500/25 scale-105' 
-                    : 'bg-slate-800/60 hover:bg-slate-700/80 text-slate-300 hover:text-white border border-slate-700/50 hover:border-slate-600'
-                }`}
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent">
+              {allMonths.map((month, idx) => {
+                const isSelected = month === selectedMonth
+                const isCurrent = month === currentMonth
+                const monthDate = new Date(month + '-01')
+                const monthName = monthDate.toLocaleString('fr-FR', { month: 'long' })
+                const year = monthDate.getFullYear()
+                
+                return (
+                  <motion.button
+                    key={month}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: idx * 0.03 }}
+                    onClick={() => toggleMonth(month)}
+                    className={`relative flex-shrink-0 flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+                      isSelected 
+                        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-500/25' 
+                        : 'bg-slate-700/40 hover:bg-slate-700/70 text-slate-300 hover:text-white border border-slate-600/30 hover:border-slate-500/50'
+                    }`}
+                  >
+                    {isCurrent && (
+                      <span className={`absolute -top-1 -right-1 flex h-3 w-3`}>
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span className={`relative inline-flex rounded-full h-3 w-3 ${isSelected ? 'bg-green-300' : 'bg-green-500'}`}></span>
+                      </span>
+                    )}
+                    <div className={`p-1.5 rounded-lg ${isSelected ? 'bg-white/20' : 'bg-slate-600/50'}`}>
+                      <Calendar className={`w-4 h-4 ${isSelected ? 'text-white' : 'text-slate-400'}`} />
+                    </div>
+                    <div className="text-left">
+                      <div className={`text-sm font-bold capitalize ${isSelected ? 'text-white' : ''}`}>
+                        {monthName}
+                      </div>
+                      <div className={`text-xs ${isSelected ? 'text-blue-200' : 'text-slate-500'}`}>
+                        {year}
+                      </div>
+                    </div>
+                  </motion.button>
+                )
+              })}
+            </div>
+            
+            {!isCurrentMonth && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="mt-3 flex items-center gap-2 px-3 py-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl"
               >
-                {isCurrent && (
-                  <span className={`absolute -top-1.5 -right-1.5 w-2.5 h-2.5 rounded-full ${
-                    isSelected ? 'bg-green-400' : 'bg-green-500'
-                  } ring-2 ring-slate-900`} />
-                )}
-                <span className="text-xs font-medium uppercase tracking-wide opacity-70">
-                  {year}
-                </span>
-                <span className="text-sm font-bold capitalize">
-                  {monthName}
-                </span>
-              </motion.button>
-            )
-          })}
-        </div>
-        
-        {!isCurrentMonth && (
-          <motion.div
-            initial={{ opacity: 0, y: -5 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-3 flex items-center gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg"
-          >
-            <Calendar className="w-4 h-4 text-amber-400 flex-shrink-0" />
-            <p className="text-xs text-amber-300">
-              Données archivées de <span className="font-semibold">{new Date(selectedMonth + '-01').toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}</span>
-              <span className="text-amber-400/70 ml-1">• Cliquez à nouveau pour revenir au mois actuel</span>
-            </p>
-          </motion.div>
-        )}
+                <div className="p-1.5 rounded-lg bg-amber-500/20">
+                  <Calendar className="w-4 h-4 text-amber-400" />
+                </div>
+                <p className="text-sm text-amber-200">
+                  Affichage des données de <span className="font-bold text-amber-100">{new Date(selectedMonth + '-01').toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}</span>
+                </p>
+              </motion.div>
+            )}
+          </CardContent>
+        </Card>
       </motion.div>
+
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div>
           <h1 className="text-3xl md:text-4xl font-bold text-white drop-shadow-lg">Tableau de bord</h1>
@@ -289,68 +332,77 @@ export default function Home() {
           </Link>
         </div>
       </div>
-      {/* Cards des comptes */}
+      {/* Cards des comptes - Affichage dynamique */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <Card className="border-blue-400/30 bg-gradient-to-br from-slate-800 to-slate-900 shadow-xl hover:shadow-2xl transition-all duration-300">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-slate-300">
-                Compte Bourso
-              </CardTitle>
-              <Wallet className="w-5 h-5 text-blue-400" />
-            </CardHeader>
-            <CardContent>
-                <div className="text-2xl md:text-3xl font-bold text-white">
-                  {boursoAccount ? `${getInitialBalance(boursoAccount.id).toFixed(2)} €` : '0.00 €'}
-                </div>
-              <p className="text-xs text-slate-400 mt-1">Dépenses occasionnelles</p>
-            </CardContent>
-          </Card>
-        </motion.div>
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <Card className="border-green-400/30 bg-gradient-to-br from-slate-800 to-slate-900 shadow-xl hover:shadow-2xl transition-all duration-300">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-slate-300">
-                Compte Caisse EP
-              </CardTitle>
-              <Wallet className="w-5 h-5 text-green-400" />
-            </CardHeader>
-            <CardContent>
-                <div className="text-2xl md:text-3xl font-bold text-white">
-                  {caisseAccount ? `${getInitialBalance(caisseAccount.id).toFixed(2)} €` : '0.00 €'}
-                </div>
-              <p className="text-xs text-slate-400 mt-1">Dépenses obligatoires</p>
-            </CardContent>
-          </Card>
-        </motion.div>
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <Card className="border-purple-400/30 bg-gradient-to-br from-slate-800 to-slate-900 shadow-xl hover:shadow-2xl transition-all duration-300">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-slate-300">
-                Total disponible
-              </CardTitle>
-              <Wallet className="w-5 h-5 text-purple-400" />
-            </CardHeader>
-            <CardContent>
-                <div className="text-2xl md:text-3xl font-bold text-purple-300">
-                  {totalBalance.toFixed(2)} €
-                </div>
-              <p className="text-xs text-slate-400 mt-1">Tous les comptes</p>
-            </CardContent>
-          </Card>
-        </motion.div>
+        {ownAccounts.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="col-span-full"
+          >
+            <Card className="border-slate-600/50 bg-gradient-to-br from-slate-800 to-slate-900 shadow-xl">
+              <CardContent className="py-8 text-center">
+                <Wallet className="w-12 h-12 text-slate-500 mx-auto mb-4" />
+                <p className="text-slate-300 mb-4">Aucun compte configuré</p>
+                <Link href="/comptes">
+                  <Button className="bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white font-semibold">
+                    Créer votre premier compte
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </motion.div>
+        ) : (
+          <>
+            {ownAccounts.slice(0, 2).map((account, index) => (
+              <motion.div
+                key={account.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 * (index + 1) }}
+              >
+                <Card className={`border-${index === 0 ? 'blue' : 'green'}-400/30 bg-gradient-to-br from-slate-800 to-slate-900 shadow-xl hover:shadow-2xl transition-all duration-300`}>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium text-slate-300">
+                      {account.name}
+                    </CardTitle>
+                    <Wallet className={`w-5 h-5 text-${index === 0 ? 'blue' : 'green'}-400`} />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl md:text-3xl font-bold text-white">
+                      {getInitialBalance(account.id).toFixed(2)} €
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">
+                      {account.type === 'obligatoire' ? 'Dépenses obligatoires' : 'Dépenses occasionnelles'}
+                    </p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <Card className="border-purple-400/30 bg-gradient-to-br from-slate-800 to-slate-900 shadow-xl hover:shadow-2xl transition-all duration-300">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-slate-300">
+                    Total disponible
+                  </CardTitle>
+                  <Wallet className="w-5 h-5 text-purple-400" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl md:text-3xl font-bold text-purple-300">
+                    {totalBalance.toFixed(2)} €
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {ownAccounts.length} compte{ownAccounts.length > 1 ? 's' : ''}
+                  </p>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </>
+        )}
       </div>
 
       {/* Revenus et Dépenses */}

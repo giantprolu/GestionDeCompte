@@ -112,7 +112,6 @@ export async function PATCH(
     const updateData: any = {
       amount: newAmount,
       date: newDate,
-      updated_at: new Date().toISOString()
     }
     if (note !== undefined) updateData.note = note
     if (category_id !== undefined) updateData.category_id = category_id

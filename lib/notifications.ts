@@ -55,7 +55,6 @@ export async function saveSubscription(subscription: WebPushSubscription, userId
         endpoint: subscription.endpoint,
         keys_p256dh: keys.p256dh,
         keys_auth: keys.auth,
-        updated_at: new Date().toISOString(),
       }, {
         onConflict: 'user_id,endpoint'
       })

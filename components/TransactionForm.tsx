@@ -130,6 +130,18 @@ export default function TransactionForm({ accounts, onSuccess, onCancel }: Trans
         <CardTitle className="text-xl font-bold text-white">Nouvelle transaction</CardTitle>
       </CardHeader>
       <CardContent className="pt-6">
+        {accounts.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-slate-300 mb-4">Vous devez d&apos;abord créer un compte bancaire pour ajouter des transactions.</p>
+            <Button
+              type="button"
+              onClick={() => window.location.href = '/comptes'}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              Créer un compte
+            </Button>
+          </div>
+        ) : (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           <div className="space-y-3">
             <Label className="text-sm font-semibold text-slate-200">Type de transaction</Label>
@@ -256,6 +268,7 @@ export default function TransactionForm({ accounts, onSuccess, onCancel }: Trans
             </Button>
           </div>
         </form>
+        )}
       </CardContent>
     </Card>
   )

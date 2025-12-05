@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Share2, UserPlus, Eye, Edit, Trash2, Users } from 'lucide-react'
 import { motion } from 'framer-motion'
 
@@ -163,29 +162,64 @@ export default function PartagePage() {
               </p>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               <Label htmlFor="permission" className="text-slate-300 font-semibold">
                 Permission
               </Label>
-              <Select value={permission} onValueChange={(value: 'view' | 'edit') => setPermission(value)}>
-                <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white h-12">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="view">
-                    <div className="flex items-center gap-2">
-                      <Eye className="w-4 h-4" />
-                      Vue seule - Peut voir uniquement
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPermission('view')}
+                  className={`relative p-4 rounded-xl border-2 transition-all duration-200 text-left ${
+                    permission === 'view'
+                      ? 'border-blue-500 bg-gradient-to-br from-blue-500/20 to-blue-600/10 shadow-lg shadow-blue-500/10'
+                      : 'border-slate-600/50 bg-slate-700/30 hover:border-slate-500 hover:bg-slate-700/50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2.5 rounded-xl ${permission === 'view' ? 'bg-blue-500/30' : 'bg-slate-600/50'}`}>
+                      <Eye className={`w-5 h-5 ${permission === 'view' ? 'text-blue-300' : 'text-slate-400'}`} />
                     </div>
-                  </SelectItem>
-                  <SelectItem value="edit">
-                    <div className="flex items-center gap-2">
-                      <Edit className="w-4 h-4" />
-                      Édition - Peut modifier les transactions
+                    <div className="flex-1">
+                      <div className={`font-bold ${permission === 'view' ? 'text-blue-300' : 'text-slate-300'}`}>
+                        Vue seule
+                      </div>
+                      <div className={`text-xs mt-0.5 ${permission === 'view' ? 'text-blue-300/70' : 'text-slate-500'}`}>
+                        Peut uniquement consulter
+                      </div>
                     </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+                    {permission === 'view' && (
+                      <div className="w-2.5 h-2.5 rounded-full bg-blue-400" />
+                    )}
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPermission('edit')}
+                  className={`relative p-4 rounded-xl border-2 transition-all duration-200 text-left ${
+                    permission === 'edit'
+                      ? 'border-emerald-500 bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 shadow-lg shadow-emerald-500/10'
+                      : 'border-slate-600/50 bg-slate-700/30 hover:border-slate-500 hover:bg-slate-700/50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2.5 rounded-xl ${permission === 'edit' ? 'bg-emerald-500/30' : 'bg-slate-600/50'}`}>
+                      <Edit className={`w-5 h-5 ${permission === 'edit' ? 'text-emerald-300' : 'text-slate-400'}`} />
+                    </div>
+                    <div className="flex-1">
+                      <div className={`font-bold ${permission === 'edit' ? 'text-emerald-300' : 'text-slate-300'}`}>
+                        Édition
+                      </div>
+                      <div className={`text-xs mt-0.5 ${permission === 'edit' ? 'text-emerald-300/70' : 'text-slate-500'}`}>
+                        Peut modifier les transactions
+                      </div>
+                    </div>
+                    {permission === 'edit' && (
+                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                    )}
+                  </div>
+                </button>
+              </div>
             </div>
 
             {error && (
@@ -256,28 +290,30 @@ export default function PartagePage() {
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <Select
-                        value={share.permission}
-                        onValueChange={(value: 'view' | 'edit') => handleUpdatePermission(share.id, value)}
-                      >
-                        <SelectTrigger className="w-40 bg-slate-800/50 border-slate-600 text-white text-sm h-10">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="view">
-                            <div className="flex items-center gap-2">
-                              <Eye className="w-3 h-3" />
-                              Vue seule
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="edit">
-                            <div className="flex items-center gap-2">
-                              <Edit className="w-3 h-3" />
-                              Édition
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <div className="flex rounded-lg overflow-hidden border border-slate-600/50">
+                        <button
+                          onClick={() => handleUpdatePermission(share.id, 'view')}
+                          className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-all ${
+                            share.permission === 'view'
+                              ? 'bg-blue-500/30 text-blue-300 border-r border-blue-500/50'
+                              : 'bg-slate-700/50 text-slate-400 hover:bg-slate-700 hover:text-slate-300 border-r border-slate-600/50'
+                          }`}
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Vue</span>
+                        </button>
+                        <button
+                          onClick={() => handleUpdatePermission(share.id, 'edit')}
+                          className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-all ${
+                            share.permission === 'edit'
+                              ? 'bg-emerald-500/30 text-emerald-300'
+                              : 'bg-slate-700/50 text-slate-400 hover:bg-slate-700 hover:text-slate-300'
+                          }`}
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Éditer</span>
+                        </button>
+                      </div>
 
                       <Button
                         variant="ghost"

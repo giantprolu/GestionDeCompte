@@ -109,7 +109,6 @@ export async function PATCH(request: NextRequest) {
       .upsert({
         user_id: userId,
         ...updates,
-        updated_at: new Date().toISOString(),
       }, {
         onConflict: 'user_id'
       })

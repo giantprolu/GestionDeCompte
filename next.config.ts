@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Désactiver les source maps en dev pour éviter les warnings
+  productionBrowserSourceMaps: false,
+  
   async headers() {
     return [
       {
@@ -33,7 +36,7 @@ const nextConfig: NextConfig = {
           },
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self'",
+            value: "default-src 'self'; script-src 'self'; connect-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://*.supabase.co",
           },
         ],
       },
