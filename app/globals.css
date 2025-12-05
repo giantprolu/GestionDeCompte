@@ -113,27 +113,65 @@ body {
   padding-right: env(safe-area-inset-right, 0px);
 }
 
-/* Mobile header with safe area */
-.mobile-header {
-  padding-top: max(0.75rem, env(safe-area-inset-top, 0.75rem));
-}
-
-/* Mobile bottom nav with safe area */
+/* Mobile bottom nav with safe area - Support iPhone avec/sans Dynamic Island */
 .mobile-nav {
-  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0.75rem));
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0.5rem));
 }
 
-/* Fix for content padding on mobile */
-.mobile-content {
-  padding-top: calc(4rem + env(safe-area-inset-top, 0px));
+/* Mobile menu button positioning avec safe area */
+.mobile-menu-btn {
+  top: max(1rem, env(safe-area-inset-top, 1rem));
+  right: max(1rem, env(safe-area-inset-right, 1rem));
+}
+
+/* Contenu principal avec safe areas */
+.main-content {
+  padding-top: max(1rem, env(safe-area-inset-top, 1rem));
   padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
 }
 
-/* Ensure touch targets are large enough */
+/* Mobile drawer avec safe areas */
+.mobile-drawer {
+  padding-top: max(1rem, env(safe-area-inset-top, 1rem));
+  padding-right: max(1.5rem, env(safe-area-inset-right, 1.5rem));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Ensure touch targets are large enough - WCAG AA compliance */
 @media (max-width: 1024px) {
   .touch-target {
     min-height: 44px;
     min-width: 44px;
+  }
+}
+
+/* Small phones (iPhone SE, etc.) */
+@media (max-width: 375px) {
+  .mobile-nav {
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+  }
+  
+  .mobile-nav .text-xs {
+    font-size: 0.65rem;
+  }
+}
+
+/* Medium phones */
+@media (min-width: 376px) and (max-width: 428px) {
+  .mobile-nav {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+}
+
+/* Large phones and small tablets */
+@media (min-width: 429px) and (max-width: 768px) {
+  .mobile-nav {
+    padding-left: 1rem;
+    padding-right: 1rem;
   }
 }
 

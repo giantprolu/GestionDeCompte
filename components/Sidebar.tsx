@@ -144,11 +144,11 @@ export default function Sidebar({ children }: SidebarProps) {
         </div>
       </aside>
 
-      {/* Mobile Menu Button - Bouton hamburger transparent en haut à droite */}
-      <div className="lg:hidden fixed top-4 right-4 z-50 safe-right">
+      {/* Mobile Menu Button - Bouton hamburger avec safe area pour Dynamic Island */}
+      <div className="lg:hidden fixed mobile-menu-btn z-50">
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="p-2.5 rounded-xl bg-slate-800/80 backdrop-blur-sm border border-white/10 hover:bg-slate-700/80 transition-all"
+          className="p-2.5 rounded-xl bg-slate-800/80 backdrop-blur-sm border border-white/10 hover:bg-slate-700/80 transition-all touch-target"
         >
           {mobileMenuOpen ? (
             <X className="w-6 h-6 text-white" />
@@ -177,7 +177,7 @@ export default function Sidebar({ children }: SidebarProps) {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="lg:hidden fixed top-0 right-0 bottom-0 w-72 bg-slate-900/95 backdrop-blur-xl border-l border-white/10 z-50 safe-right"
+              className="lg:hidden fixed top-0 right-0 bottom-0 w-72 max-w-[85vw] bg-slate-900/95 backdrop-blur-xl border-l border-white/10 z-50 mobile-drawer"
             >
               <div className="flex flex-col h-full p-6 pt-16">
                 {/* Logo */}
@@ -246,7 +246,7 @@ export default function Sidebar({ children }: SidebarProps) {
 
       {/* Bottom Navigation Mobile - avec support safe area Android/iOS */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 glass border-t border-white/10 backdrop-blur-xl mobile-nav safe-left safe-right">
-        <div className="flex items-center justify-around px-4 pt-2 pb-1">
+        <div className="flex items-center justify-around px-2 xs:px-4 pt-2 pb-1">
           {filteredNavItems.map((item) => {
             const Icon = item.icon
             const isActive = pathname === item.href
@@ -256,12 +256,12 @@ export default function Sidebar({ children }: SidebarProps) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  'flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition min-w-[70px]',
+                  'flex flex-col items-center gap-0.5 px-2 xs:px-4 py-2 rounded-xl transition min-w-[56px] xs:min-w-[70px] touch-target',
                   isActive ? 'text-emerald-400' : 'text-gray-400'
                 )}
               >
-                <Icon className={cn('w-6 h-6', isActive && 'animate-bounce')} />
-                <span className="text-xs font-medium">{item.label}</span>
+                <Icon className={cn('w-5 h-5 xs:w-6 xs:h-6', isActive && 'animate-bounce')} />
+                <span className="text-[10px] xs:text-xs font-medium truncate max-w-[60px]">{item.label}</span>
               </Link>
             )
           })}
@@ -270,7 +270,7 @@ export default function Sidebar({ children }: SidebarProps) {
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
-        <div className="p-4 lg:p-8 pb-24 lg:pb-8 pt-4 lg:pt-8">
+        <div className="p-4 lg:p-8 main-content lg:!pt-8 lg:!pb-8">
           {children}
         </div>
       </main>

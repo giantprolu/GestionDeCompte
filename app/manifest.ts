@@ -7,9 +7,13 @@ export default function manifest(): MetadataRoute.Manifest {
     description: 'Application de gestion de dépenses et de comptes bancaires',
     start_url: '/',
     display: 'standalone',
+    display_override: ['standalone', 'minimal-ui'],
     background_color: '#0f172a',
     theme_color: '#10b981',
-    orientation: 'portrait',
+    orientation: 'portrait-primary',
+    scope: '/',
+    id: 'moneyflow-app',
+    categories: ['finance', 'productivity'],
     icons: [
       {
         src: '/icon-192x192.png',
