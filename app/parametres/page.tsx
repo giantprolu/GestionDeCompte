@@ -237,15 +237,12 @@ export default function ParametresPage() {
           </p>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-white font-medium">Activer les notifications</p>
-              <p className="text-slate-400 text-sm">
-                Recevez des alertes même quand l&apos;app est fermée
-              </p>
-            </div>
-            <PushNotificationManager showLabel={false} />
-          </div>
+          <PushNotificationManager 
+            showLabel={true} 
+            fullWidth={true}
+            labelText="Activer les notifications"
+            description="Recevez des alertes même quand l'app est fermée"
+          />
         </CardContent>
       </Card>
 

@@ -19,11 +19,17 @@ function urlBase64ToUint8Array(base64String: string) {
 interface PushNotificationManagerProps {
   showLabel?: boolean
   className?: string
+  fullWidth?: boolean
+  labelText?: string
+  description?: string
 }
 
 export default function PushNotificationManager({ 
   showLabel = true,
-  className = ''
+  className = '',
+  fullWidth = false,
+  labelText,
+  description
 }: PushNotificationManagerProps) {
   const { user, isLoaded } = useUser()
   const [subscription, setSubscription] = useState<PushSubscription | null>(null)
@@ -199,6 +205,46 @@ export default function PushNotificationManager({
   }
 
   const isActive = subscription !== null || hasServerSubscription
+
+  // Version pleine largeur avec description
+  if (fullWidth) {
+    return (
+      <button
+        onClick={isActive ? unsubscribeFromPush : subscribeToPush}
+        disabled={isLoading}
+        className={`
+          w-full flex items-center justify-between p-4 rounded-xl transition-all duration-300
+          ${isActive 
+            ? 'bg-green-600/20 hover:bg-green-600/30 border border-green-500/50' 
+            : 'bg-slate-700/50 hover:bg-slate-600/50 border border-slate-600/50'
+          }
+          ${isLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+          ${className}
+        `}
+      >
+        <div className="text-left">
+          <p className={`font-medium ${isActive ? 'text-green-300' : 'text-white'}`}>
+            {labelText || (isActive ? 'Notifications activées' : 'Activer les notifications')}
+          </p>
+          {description && (
+            <p className="text-slate-400 text-sm mt-0.5">{description}</p>
+          )}
+        </div>
+        <div className={`
+          p-2.5 rounded-xl transition-colors
+          ${isActive ? 'bg-green-500/30' : 'bg-slate-600/50'}
+        `}>
+          {isLoading ? (
+            <Loader2 className="h-5 w-5 animate-spin text-slate-300" />
+          ) : isActive ? (
+            <Bell className="h-5 w-5 text-green-400" />
+          ) : (
+            <BellOff className="h-5 w-5 text-slate-400" />
+          )}
+        </div>
+      </button>
+    )
+  }
 
   return (
     <Button

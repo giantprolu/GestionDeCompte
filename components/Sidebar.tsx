@@ -1,12 +1,23 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, ArrowLeftRight, Wallet, Share2, type LucideIcon, Sparkles, Settings } from 'lucide-react'
+import { Home, ArrowLeftRight, Wallet, Share2, type LucideIcon, Sparkles, Settings, Menu, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton } from '@clerk/nextjs'
 import { useUserSettings } from '@/components/AppWrapper'
+import { motion, AnimatePresence } from 'framer-motion'
+
+// Hook pour détecter si on est côté client (évite hydration mismatch)
+const emptySubscribe = () => () => {}
+function useIsMounted() {
+  return useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  )
+}
 
 interface NavItem {
   href: string
@@ -30,12 +41,18 @@ interface SidebarProps {
 
 export default function Sidebar({ children }: SidebarProps) {
   const pathname = usePathname()
-  const [mounted, setMounted] = useState(false)
+  const mounted = useIsMounted()
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [lastPathname, setLastPathname] = useState(pathname)
   const { userType } = useUserSettings()
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  // Fermer le menu mobile quand on change de page
+  if (pathname !== lastPathname) {
+    setLastPathname(pathname)
+    if (mobileMenuOpen) {
+      setMobileMenuOpen(false)
+    }
+  }
 
   // Filtrer les éléments de navigation selon le type d'utilisateur
   const filteredNavItems = navItems.filter(item => {
@@ -106,7 +123,7 @@ export default function Sidebar({ children }: SidebarProps) {
                   </SignInButton>
                   <SignUpButton mode="modal">
                     <button className="w-full px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700 rounded-xl transition shadow-lg">
-                      S'inscrire
+                      S&apos;inscrire
                     </button>
                   </SignUpButton>
                 </div>
@@ -127,38 +144,105 @@ export default function Sidebar({ children }: SidebarProps) {
         </div>
       </aside>
 
-      {/* Mobile Header - avec support Dynamic Island et notch */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 glass border-b border-white/10 px-4 backdrop-blur-xl mobile-header safe-left safe-right">
-        <div className="flex items-center justify-between py-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-blue-600 flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
-            <h1 className="text-lg font-bold gradient-text">MoneyFlow</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            {mounted && (
-              <>
-                <SignedIn>
-                  <Link href="/parametres">
-                    <button className="p-2 hover:bg-white/10 rounded-lg transition" title="Paramètres">
-                      <Settings className="w-5 h-5 text-gray-400 hover:text-white" />
-                    </button>
-                  </Link>
-                  <UserButton />
-                </SignedIn>
-                <SignedOut>
-                  <SignInButton mode="modal">
-                    <button className="px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700 rounded-lg transition shadow-lg">
-                      Connexion
-                    </button>
-                  </SignInButton>
-                </SignedOut>
-              </>
-            )}
-          </div>
-        </div>
+      {/* Mobile Menu Button - Bouton hamburger transparent en haut à droite */}
+      <div className="lg:hidden fixed top-4 right-4 z-50 safe-right">
+        <button
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className="p-2.5 rounded-xl bg-slate-800/80 backdrop-blur-sm border border-white/10 hover:bg-slate-700/80 transition-all"
+        >
+          {mobileMenuOpen ? (
+            <X className="w-6 h-6 text-white" />
+          ) : (
+            <Menu className="w-6 h-6 text-white" />
+          )}
+        </button>
       </div>
+
+      {/* Mobile Drawer Menu */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <>
+            {/* Overlay */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMobileMenuOpen(false)}
+              className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+            />
+            
+            {/* Menu Drawer */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="lg:hidden fixed top-0 right-0 bottom-0 w-72 bg-slate-900/95 backdrop-blur-xl border-l border-white/10 z-50 safe-right"
+            >
+              <div className="flex flex-col h-full p-6 pt-16">
+                {/* Logo */}
+                <div className="mb-6">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-blue-600 flex items-center justify-center shadow-lg">
+                      <Sparkles className="w-6 h-6 text-white" />
+                    </div>
+                    <h1 className="text-xl font-bold gradient-text">MoneyFlow</h1>
+                  </div>
+                </div>
+
+                {/* User Section */}
+                <div className="mb-6 pb-6 border-b border-white/10">
+                  {mounted && (
+                    <>
+                      <SignedOut>
+                        <div className="space-y-2">
+                          <SignInButton mode="modal">
+                            <button className="w-full px-4 py-2.5 text-sm font-medium text-white bg-white/10 hover:bg-white/20 rounded-xl transition border border-white/10">
+                              Se connecter
+                            </button>
+                          </SignInButton>
+                          <SignUpButton mode="modal">
+                            <button className="w-full px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700 rounded-xl transition shadow-lg">
+                              S&apos;inscrire
+                            </button>
+                          </SignUpButton>
+                        </div>
+                      </SignedOut>
+                      <SignedIn>
+                        <div className="flex items-center gap-3 px-4 py-3 glass rounded-xl border border-white/10">
+                          <UserButton />
+                          <span className="text-sm text-gray-300 flex-1">Mon compte</span>
+                        </div>
+                      </SignedIn>
+                    </>
+                  )}
+                </div>
+
+                {/* Menu Items */}
+                <nav className="space-y-2 flex-1">
+                  <Link
+                    href="/parametres"
+                    className={cn(
+                      'flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300',
+                      pathname === '/parametres'
+                        ? 'bg-gradient-to-r from-emerald-500/20 to-blue-500/20 text-white border border-emerald-500/30'
+                        : 'text-gray-400 hover:text-white hover:bg-white/5'
+                    )}
+                  >
+                    <Settings className="w-5 h-5" />
+                    <span className="font-medium">Paramètres</span>
+                  </Link>
+                </nav>
+
+                {/* Version */}
+                <div className="pt-4 border-t border-white/10">
+                  <p className="text-xs text-slate-500 text-center">MoneyFlow v1.0</p>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Bottom Navigation Mobile - avec support safe area Android/iOS */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 glass border-t border-white/10 backdrop-blur-xl mobile-nav safe-left safe-right">
@@ -186,7 +270,7 @@ export default function Sidebar({ children }: SidebarProps) {
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
-        <div className="p-4 lg:p-8 lg:pt-8 lg:pb-8 mobile-content lg:!pt-8 lg:!pb-8">
+        <div className="p-4 lg:p-8 pb-24 lg:pb-8 pt-4 lg:pt-8">
           {children}
         </div>
       </main>
