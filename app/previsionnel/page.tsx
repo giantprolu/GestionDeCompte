@@ -472,7 +472,7 @@ export default function PrevisionnelPage() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="space-y-3"
+                    className="space-y-3 max-h-[50vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent"
                   >
                     <div className="flex items-center justify-between mb-4 p-3 rounded-lg bg-blue-900/20 border border-blue-500/20">
                       <div className="flex items-center gap-2">
@@ -581,7 +581,7 @@ export default function PrevisionnelPage() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="space-y-3"
+                    className="space-y-3 max-h-[50vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent"
                   >
                     <div className="flex items-center justify-between mb-4 p-3 rounded-lg bg-orange-900/20 border border-orange-500/20">
                       <div className="flex items-center gap-2">

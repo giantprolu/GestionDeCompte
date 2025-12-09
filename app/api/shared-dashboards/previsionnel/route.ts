@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { supabase } from '@/lib/db'
 
+// Catégories fixes à exclure du budget variable
+const FIXED_CATEGORIES = ['logement', 'allocation', 'assurances', 'santé', 'abonnements']
+
+// Vérifier si une catégorie est fixe
+const isFixedCategory = (categoryName: string) => {
+  const normalized = categoryName.toLowerCase().trim()
+  return FIXED_CATEGORIES.some(fixed => normalized.includes(fixed))
+}
+
 // Helper pour obtenir le mois précédent au format YYYY-MM
 function getPreviousMonth(monthYear: string): string {
   const [year, month] = monthYear.split('-').map(Number)
@@ -45,15 +54,25 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Accès non autorisé à ce dashboard' }, { status: 403 })
     }
 
-    // Récupérer les comptes du propriétaire
+    // Récupérer les comptes du propriétaire avec leurs soldes
     const { data: accounts } = await supabase
       .from('accounts')
-      .select('id')
+      .select('id, name, exclude_from_previsionnel, initial_balance')
       .eq('user_id', ownerUserId)
 
-    const accountIds = (accounts || []).map((a: { id: string }) => a.id)
+    // Filtrer les comptes inclus/exclus du prévisionnel
+    const accountsIncluded = (accounts || []).filter((a: { exclude_from_previsionnel?: boolean }) => a.exclude_from_previsionnel !== true)
+    const accountsExcluded = (accounts || []).filter((a: { exclude_from_previsionnel?: boolean }) => a.exclude_from_previsionnel === true)
+    const accountIds = accountsIncluded.map((a: { id: string }) => a.id)
+    
+    // Calculer les totaux des soldes
+    const totalBalanceIncluded = accountsIncluded.reduce((sum: number, a: { initial_balance?: number }) => sum + Number(a.initial_balance || 0), 0)
+    const totalBalanceExcluded = accountsExcluded.reduce((sum: number, a: { initial_balance?: number }) => sum + Number(a.initial_balance || 0), 0)
+    const totalBalanceAll = totalBalanceIncluded + totalBalanceExcluded
+    const excludedCount = accountsExcluded.length
+    
     if (accountIds.length === 0) {
-      return NextResponse.json({ totals: [] })
+      return NextResponse.json({ totals: [], fixedTotals: [], summary: null })
     }
 
     // Déterminer les dates de début/fin en utilisant les clôtures
@@ -137,29 +156,59 @@ export async function GET(request: NextRequest) {
     if (error) throw error
     const transactions = txs || []
 
-    // Agrégation par catégorie - filtrer les dépenses
+    // Agrégation par catégorie - séparer fixes et variables
     const sums: Record<string, number> = {}
+    const fixedSums: Record<string, number> = {}
+    let totalIncome = 0
+    let totalFixedExpenses = 0
+    let totalVariableExpenses = 0
+    
     for (const t of transactions) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const rawCat = (t as Record<string, unknown>).category as any
       const catData = Array.isArray(rawCat) ? rawCat[0] : rawCat
       const catType = catData?.type
       const txType = (t as Record<string, unknown>).type
-      
-      if (txType !== 'expense' && catType !== 'expense') continue
-      
+      const name = catData?.name || 'Non catégorisé'
       const amt = Number(t.amount || 0)
       const val = amt < 0 ? Math.abs(amt) : amt
-      const name = catData?.name || 'Non catégorisé'
-      sums[name] = (sums[name] || 0) + val
+      
+      // Revenus
+      if (txType === 'income') {
+        totalIncome += val
+        continue
+      }
+      
+      // Considérer comme dépense si le type de transaction OU le type de catégorie est 'expense'
+      if (txType !== 'expense' && catType !== 'expense') continue
+      
+      // Séparer dépenses fixes et variables
+      if (isFixedCategory(name)) {
+        fixedSums[name] = (fixedSums[name] || 0) + val
+        totalFixedExpenses += val
+      } else {
+        sums[name] = (sums[name] || 0) + val
+        totalVariableExpenses += val
+      }
     }
 
-    const result = Object.keys(sums).map(k => ({ 
+    // Dépenses variables
+    const variableTotals = Object.keys(sums).map(k => ({ 
       category: k, 
       total: Number(sums[k].toFixed(2)), 
-      avgPerMonth: Number((sums[k] / monthsWindow).toFixed(2)) 
+      avgPerMonth: Number((sums[k] / monthsWindow).toFixed(2)),
+      isFixed: false
     }))
-    result.sort((a, b) => b.total - a.total)
+    variableTotals.sort((a, b) => b.total - a.total)
+    
+    // Dépenses fixes
+    const fixedTotals = Object.keys(fixedSums).map(k => ({ 
+      category: k, 
+      total: Number(fixedSums[k].toFixed(2)), 
+      avgPerMonth: Number((fixedSums[k] / monthsWindow).toFixed(2)),
+      isFixed: true
+    }))
+    fixedTotals.sort((a, b) => b.total - a.total)
 
     // Récupérer les objectifs de dépenses du propriétaire
     const { data: ownerSettings } = await supabase
@@ -171,9 +220,20 @@ export async function GET(request: NextRequest) {
     const targets = ownerSettings?.spend_targets || {}
 
     return NextResponse.json({ 
-      totals: result,
+      totals: variableTotals,
+      fixedTotals: fixedTotals,
       targets,
-      meta: { monthsWindow, startDate, endDate, useNonArchived } 
+      summary: {
+        totalIncome: Number(totalIncome.toFixed(2)),
+        totalFixedExpenses: Number(totalFixedExpenses.toFixed(2)),
+        totalVariableExpenses: Number(totalVariableExpenses.toFixed(2)),
+        availableForVariable: Number((totalIncome - totalFixedExpenses).toFixed(2)),
+        potentialSavings: Number((totalIncome - totalFixedExpenses - totalVariableExpenses).toFixed(2)),
+        totalBalanceIncluded: Number(totalBalanceIncluded.toFixed(2)),
+        totalBalanceExcluded: Number(totalBalanceExcluded.toFixed(2)),
+        totalBalanceAll: Number(totalBalanceAll.toFixed(2))
+      },
+      meta: { monthsWindow, startDate, endDate, useNonArchived, excludedAccountsCount: excludedCount } 
     })
   } catch (err) {
     console.error('Error /api/shared-dashboards/previsionnel GET:', err)

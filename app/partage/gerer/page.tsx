@@ -120,7 +120,7 @@ export default function PartagePage() {
   }
 
   return (
-    <div className="space-y-6 md:space-y-8 pb-20 md:pb-8">
+    <div className="space-y-6 md:space-y-8 pb-20 md:pb-8 px-3 sm:px-4 md:px-6 pt-4">
       <div>
         <h1 className="text-3xl md:text-4xl font-bold text-white drop-shadow-lg flex items-center gap-3">
           <Share2 className="w-8 h-8 md:w-10 md:h-10 text-purple-400" />

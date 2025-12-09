@@ -70,7 +70,7 @@ export default function Sidebar({ children }: SidebarProps) {
       {/* Sidebar Desktop - Glassmorphism */}
       <aside className="hidden lg:flex flex-col w-72 glass border-r border-white/10 p-6">
         {/* Logo */}
-        <div className="mb-8">
+        <div className="mb-4">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-blue-600 flex items-center justify-center shadow-lg">
               <Sparkles className="w-6 h-6 text-white" />
@@ -78,6 +78,39 @@ export default function Sidebar({ children }: SidebarProps) {
             <h1 className="text-2xl font-bold gradient-text">MoneyFlow</h1>
           </div>
           <p className="text-sm text-gray-400 ml-13">Gestion financière intelligente</p>
+        </div>
+
+        {/* User Section - En haut */}
+        <div className="mb-6 pb-4 border-b border-white/10">
+          {mounted && (
+            <>
+              <SignedOut>
+                <div className="space-y-2">
+                  <SignInButton mode="modal">
+                    <button className="w-full px-4 py-2.5 text-sm font-medium text-white bg-white/10 hover:bg-white/20 rounded-xl transition border border-white/10">
+                      Se connecter
+                    </button>
+                  </SignInButton>
+                  <SignUpButton mode="modal">
+                    <button className="w-full px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700 rounded-xl transition shadow-lg">
+                      S&apos;inscrire
+                    </button>
+                  </SignUpButton>
+                </div>
+              </SignedOut>
+              <SignedIn>
+                <div className="flex items-center gap-3 px-4 py-3 glass rounded-xl border border-white/10">
+                  <UserButton />
+                  <span className="text-sm text-gray-300 flex-1">Mon compte</span>
+                  <Link href="/parametres">
+                    <button className="p-2 hover:bg-white/10 rounded-lg transition" title="Paramètres">
+                      <Settings className="w-4 h-4 text-gray-400 hover:text-white" />
+                    </button>
+                  </Link>
+                </div>
+              </SignedIn>
+            </>
+          )}
         </div>
 
         {/* Navigation */}
@@ -109,39 +142,6 @@ export default function Sidebar({ children }: SidebarProps) {
             )
           })}
         </nav>
-
-        {/* User Section */}
-        <div className="mt-auto pt-6 border-t border-white/10">
-          {mounted && (
-            <>
-              <SignedOut>
-                <div className="space-y-2">
-                  <SignInButton mode="modal">
-                    <button className="w-full px-4 py-2.5 text-sm font-medium text-white bg-white/10 hover:bg-white/20 rounded-xl transition border border-white/10">
-                      Se connecter
-                    </button>
-                  </SignInButton>
-                  <SignUpButton mode="modal">
-                    <button className="w-full px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-emerald-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700 rounded-xl transition shadow-lg">
-                      S&apos;inscrire
-                    </button>
-                  </SignUpButton>
-                </div>
-              </SignedOut>
-              <SignedIn>
-                <div className="flex items-center gap-3 px-4 py-3 glass rounded-xl border border-white/10">
-                  <UserButton />
-                  <span className="text-sm text-gray-300 flex-1">Mon compte</span>
-                  <Link href="/parametres">
-                    <button className="p-2 hover:bg-white/10 rounded-lg transition" title="Paramètres">
-                      <Settings className="w-4 h-4 text-gray-400 hover:text-white" />
-                    </button>
-                  </Link>
-                </div>
-              </SignedIn>
-            </>
-          )}
-        </div>
       </aside>
 
       {/* Mobile Menu Button - Bouton hamburger avec safe area pour Dynamic Island */}

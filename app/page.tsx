@@ -217,93 +217,103 @@ export default function Home() {
   };
 
   return (
-    <div className="space-y-6 md:space-y-8 pb-20 md:pb-8">
-      {/* Sélecteur de période amélioré */}
+    <div className="space-y-6 md:space-y-8 pb-20 md:pb-8 px-3 sm:px-4 md:px-6 pt-4">
+      {/* En-tête avec titre et sélecteur de période */}
       <motion.div 
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative"
+        className="space-y-4"
       >
+        {/* Titre et boutons d'action */}
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-bold text-white drop-shadow-lg">Tableau de bord</h1>
+            <p className="text-slate-200 mt-2 text-base md:text-lg font-medium">Vue d&apos;ensemble de vos finances</p>
+          </div>
+          <div className="flex flex-col gap-2 md:flex-row md:items-center">
+            <Button
+              className="w-full md:w-auto bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200 px-6 py-6 text-base"
+              onClick={handleChangeMonth}
+            >
+              <Calendar className="w-5 h-5 mr-2" />
+              Débit d'un nouveau mois
+            </Button>
+            <Link href="/transactions">
+              <Button className="w-full md:w-auto bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200 px-6 py-6 text-base">
+                <TrendingUp className="w-5 h-5 mr-2" />
+                Voir les transactions
+              </Button>
+            </Link>
+          </div>
+        </div>
+
+        {/* Sélecteur de période compact */}
         <Card className="border-slate-700/50 bg-gradient-to-br from-slate-800/80 to-slate-900/80 shadow-lg overflow-hidden">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/30">
-                  <Calendar className="w-5 h-5 text-blue-400" />
+          <CardContent className="p-3">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/30">
+                  <Calendar className="w-4 h-4 text-blue-400" />
                 </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-white">Période</h3>
-                  <p className="text-xs text-slate-400">
-                    {isCurrentMonth ? 'Mois en cours' : 'Données archivées'}
-                  </p>
-                </div>
+                <span className="text-sm font-medium text-slate-300 hidden sm:inline">Période :</span>
               </div>
+              
+              <div className="flex gap-2 overflow-x-auto flex-1 pb-1 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent">
+                {allMonths.map((month, idx) => {
+                  const isSelected = month === selectedMonth
+                  const isCurrent = month === currentMonth
+                  const monthDate = new Date(month + '-01')
+                  const monthName = monthDate.toLocaleString('fr-FR', { month: 'short' })
+                  const year = monthDate.getFullYear().toString().slice(-2)
+                  
+                  return (
+                    <motion.button
+                      key={month}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: idx * 0.03 }}
+                      onClick={() => toggleMonth(month)}
+                      className={`relative flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 ${
+                        isSelected 
+                          ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-500/25' 
+                          : 'bg-slate-700/40 hover:bg-slate-700/70 text-slate-300 hover:text-white border border-slate-600/30 hover:border-slate-500/50'
+                      }`}
+                    >
+                      {isCurrent && (
+                        <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                          <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isSelected ? 'bg-green-300' : 'bg-green-500'}`}></span>
+                        </span>
+                      )}
+                      <span className={`text-sm font-semibold capitalize`}>
+                        {monthName} {year}
+                      </span>
+                    </motion.button>
+                  )
+                })}
+              </div>
+
               {!isCurrentMonth && (
                 <motion.button
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   onClick={() => toggleMonth(currentMonth)}
-                  className="px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-300 text-xs font-medium border border-blue-500/30 hover:bg-blue-500/30 transition-colors"
+                  className="flex-shrink-0 px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-300 text-xs font-medium border border-blue-500/30 hover:bg-blue-500/30 transition-colors"
                 >
-                  ← Revenir au mois actuel
+                  ← Actuel
                 </motion.button>
               )}
-            </div>
-            
-            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent">
-              {allMonths.map((month, idx) => {
-                const isSelected = month === selectedMonth
-                const isCurrent = month === currentMonth
-                const monthDate = new Date(month + '-01')
-                const monthName = monthDate.toLocaleString('fr-FR', { month: 'long' })
-                const year = monthDate.getFullYear()
-                
-                return (
-                  <motion.button
-                    key={month}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: idx * 0.03 }}
-                    onClick={() => toggleMonth(month)}
-                    className={`relative flex-shrink-0 flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-                      isSelected 
-                        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-500/25' 
-                        : 'bg-slate-700/40 hover:bg-slate-700/70 text-slate-300 hover:text-white border border-slate-600/30 hover:border-slate-500/50'
-                    }`}
-                  >
-                    {isCurrent && (
-                      <span className={`absolute -top-1 -right-1 flex h-3 w-3`}>
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                        <span className={`relative inline-flex rounded-full h-3 w-3 ${isSelected ? 'bg-green-300' : 'bg-green-500'}`}></span>
-                      </span>
-                    )}
-                    <div className={`p-1.5 rounded-lg ${isSelected ? 'bg-white/20' : 'bg-slate-600/50'}`}>
-                      <Calendar className={`w-4 h-4 ${isSelected ? 'text-white' : 'text-slate-400'}`} />
-                    </div>
-                    <div className="text-left">
-                      <div className={`text-sm font-bold capitalize ${isSelected ? 'text-white' : ''}`}>
-                        {monthName}
-                      </div>
-                      <div className={`text-xs ${isSelected ? 'text-blue-200' : 'text-slate-500'}`}>
-                        {year}
-                      </div>
-                    </div>
-                  </motion.button>
-                )
-              })}
             </div>
             
             {!isCurrentMonth && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
-                className="mt-3 flex items-center gap-2 px-3 py-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl"
+                className="mt-2 flex items-center gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg"
               >
-                <div className="p-1.5 rounded-lg bg-amber-500/20">
-                  <Calendar className="w-4 h-4 text-amber-400" />
-                </div>
+                <Calendar className="w-4 h-4 text-amber-400" />
                 <p className="text-sm text-amber-200">
-                  Affichage des données de <span className="font-bold text-amber-100">{new Date(selectedMonth + '-01').toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}</span>
+                  Données de <span className="font-bold text-amber-100">{new Date(selectedMonth + '-01').toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}</span>
                 </p>
               </motion.div>
             )}
@@ -311,27 +321,6 @@ export default function Home() {
         </Card>
       </motion.div>
 
-      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl md:text-4xl font-bold text-white drop-shadow-lg">Tableau de bord</h1>
-          <p className="text-slate-200 mt-2 text-base md:text-lg font-medium">Vue d&apos;ensemble de vos finances</p>
-        </div>
-        <div className="flex flex-col gap-2 md:flex-row md:items-center">
-          <Button
-            className="w-full md:w-auto bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200 px-6 py-6 text-base"
-            onClick={handleChangeMonth}
-          >
-            <Calendar className="w-5 h-5 mr-2" />
-            Débit d’un nouveau mois
-          </Button>
-          <Link href="/transactions">
-            <Button className="w-full md:w-auto bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200 px-6 py-6 text-base">
-              <TrendingUp className="w-5 h-5 mr-2" />
-              Voir les transactions
-            </Button>
-          </Link>
-        </div>
-      </div>
       {/* Cards des comptes - Affichage dynamique */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {ownAccounts.length === 0 ? (

@@ -308,7 +308,7 @@ export default function TransactionsPage() {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-4 md:space-y-6 pb-20 md:pb-8"
+      className="space-y-4 md:space-y-6 pb-20 md:pb-8 px-3 sm:px-4 md:px-6 pt-4"
     >
       {/* Indicateur du mois affiché */}
       {!isCurrentMonth && !showAllMonths && (
@@ -523,7 +523,7 @@ export default function TransactionsPage() {
               Aucune transaction trouvée
             </p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent">
               {filteredTransactions.map((transaction) => {
                 const isFuture = new Date(transaction.date) > new Date()
                 return (
