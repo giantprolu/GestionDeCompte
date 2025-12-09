@@ -42,16 +42,20 @@ export async function POST(request: Request) {
     const savingsRate = Number(body.savingsRate ?? 0.1)
     const objectifs = body.targets || {};
 
-    // load user's accounts
+    // load user's accounts (exclure ceux marqués exclude_from_previsionnel)
     const { data: accounts } = await supabase
       .from('accounts')
-      .select('id')
+      .select('id, exclude_from_previsionnel')
       .eq('user_id', userId)
 
-    const accountIds = (accounts || []).map((a: { id: string }) => a.id)
+    // Filtrer les comptes qui ne sont pas exclus du prévisionnel
+    // On utilise === true pour être sûr de ne prendre que les comptes explicitement marqués comme exclus
+    const accountIds = (accounts || [])
+      .filter((a: { id: string; exclude_from_previsionnel?: boolean | null }) => a.exclude_from_previsionnel !== true)
+      .map((a: { id: string }) => a.id)
 
     if (accountIds.length === 0) {
-      return NextResponse.json({ error: 'Aucun compte trouvé' }, { status: 400 })
+      return NextResponse.json({ error: 'Aucun compte trouvé (ou tous exclus du prévisionnel)' }, { status: 400 })
     }
 
     // Pour les recommandations, on utilise les N mois PRÉCÉDENTS (pas le mois actuel)

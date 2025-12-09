@@ -29,7 +29,7 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: "MoneyFlow - Gestion de Comptes",
-  description: "Application de gestion de dépenses pour deux comptes bancaires",
+  description: "Application de gestion de dépenses pour des comptes bancaires",
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,

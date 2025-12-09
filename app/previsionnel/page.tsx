@@ -50,12 +50,16 @@ export default function PrevisionnelPage() {
   const [fileError, setFileError] = useState<string | null>(null)
   
   const [fixedTotals, setFixedTotals] = useState<{ category: string; total: number }[]>([])
+  const [excludedAccountsCount, setExcludedAccountsCount] = useState<number>(0)
   const [summary, setSummary] = useState<{
     totalIncome: number
     totalFixedExpenses: number
     totalVariableExpenses: number
     availableForVariable: number
     potentialSavings: number
+    totalBalanceIncluded: number
+    totalBalanceExcluded: number
+    totalBalanceAll: number
   } | null>(null)
 
   // Rediriger les visionneurs vers la page partage
@@ -97,17 +101,20 @@ export default function PrevisionnelPage() {
     const fetchTotals = async () => {
       setLoading(true)
       try {
-        const res = await fetch(`/api/previsionnel/totals?monthsWindow=${monthsWindow}&selectedMonth=${selectedMonth}`)
+        // includeFuture=false pour exclure les transactions futures (cohérent avec la page Transactions)
+        const res = await fetch(`/api/previsionnel/totals?monthsWindow=${monthsWindow}&selectedMonth=${selectedMonth}&includeFuture=false`)
         const json = await res.json()
         if (!res.ok) {
           console.error('Erreur totals', json)
           setTotals([])
           setFixedTotals([])
           setSummary(null)
+          setExcludedAccountsCount(0)
         } else {
           setTotals(json.totals || [])
           setFixedTotals(json.fixedTotals || [])
           setSummary(json.summary || null)
+          setExcludedAccountsCount(json.meta?.excludedAccountsCount || 0)
         }
       } catch (err) {
         console.error('Erreur fetch totals', err)
@@ -168,7 +175,8 @@ export default function PrevisionnelPage() {
   
   // Budget disponible et épargne
   const availableForVariable = summary?.availableForVariable || 0
-  const potentialSavings = summary?.potentialSavings || 0
+  // L'épargne potentielle = solde total des comptes inclus (cohérent avec Total disponible du dashboard - comptes exclus)
+  const potentialSavings = summary?.totalBalanceIncluded || 0
   const remainingBudget = availableForVariable - totalVariableSpent
 
   return (
@@ -355,6 +363,15 @@ export default function PrevisionnelPage() {
               <p className="text-xs text-slate-500 mt-2">
                 Les recommandations sont basées sur vos {monthsWindow} mois précédent{monthsWindow > 1 ? 's' : ''} pour vous aider à mieux gérer ce mois-ci
               </p>
+              {excludedAccountsCount > 0 && (
+                <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-500/10 border border-orange-500/30">
+                  <Calculator className="w-4 h-4 text-orange-400" />
+                  <span className="text-xs text-orange-300">
+                    {excludedAccountsCount} compte{excludedAccountsCount > 1 ? 's' : ''} exclu{excludedAccountsCount > 1 ? 's' : ''} du calcul 
+                    <a href="/comptes" className="ml-1 underline hover:text-orange-200">(gérer)</a>
+                  </span>
+                </div>
+              )}
             </CardHeader>
             <CardContent className="p-4">
               <div className="flex flex-wrap gap-2">
@@ -717,26 +734,24 @@ export default function PrevisionnelPage() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
                 <PiggyBank className="w-4 h-4 text-emerald-400" />
-                Objectif épargne
+                Solde disponible
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between py-2 border-b border-slate-700/50">
-                <span className="text-xs text-slate-400">Revenus</span>
-                <span className="text-sm font-medium text-green-400">+{fmt(summary?.totalIncome || 0)}</span>
+                <span className="text-xs text-slate-400">Total tous comptes</span>
+                <span className="text-sm font-medium text-slate-300">{fmt(summary?.totalBalanceAll || 0)}</span>
               </div>
-              <div className="flex items-center justify-between py-2 border-b border-slate-700/50">
-                <span className="text-xs text-slate-400">Charges fixes</span>
-                <span className="text-sm font-medium text-orange-400">-{fmt(summary?.totalFixedExpenses || 0)}</span>
-              </div>
-              <div className="flex items-center justify-between py-2 border-b border-slate-700/50">
-                <span className="text-xs text-slate-400">Dépenses variables</span>
-                <span className="text-sm font-medium text-blue-400">-{fmt(summary?.totalVariableExpenses || 0)}</span>
-              </div>
+              {(summary?.totalBalanceExcluded || 0) > 0 && (
+                <div className="flex items-center justify-between py-2 border-b border-slate-700/50">
+                  <span className="text-xs text-slate-400">Comptes exclus</span>
+                  <span className="text-sm font-medium text-orange-400">-{fmt(summary?.totalBalanceExcluded || 0)}</span>
+                </div>
+              )}
               <div className="flex items-center justify-between py-2 pt-3 border-t border-slate-600">
-                <span className="text-sm font-medium text-emerald-300">Épargne possible</span>
-                <span className={`text-lg font-bold ${(summary?.potentialSavings || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {fmt(summary?.potentialSavings || 0)}
+                <span className="text-sm font-medium text-emerald-300">Épargne potentielle</span>
+                <span className={`text-lg font-bold ${potentialSavings >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {fmt(potentialSavings)}
                 </span>
               </div>
             </CardContent>
@@ -751,16 +766,16 @@ export default function PrevisionnelPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {(summary?.potentialSavings || 0) > 0 ? (
+              {potentialSavings > 0 ? (
                 <div className="p-3 rounded-lg bg-emerald-900/20 border border-emerald-500/20">
                   <p className="text-xs text-emerald-300">
-                    🎉 Vous pouvez épargner <strong>{fmt(summary?.potentialSavings || 0)}</strong> ce mois !
+                    🎉 Solde disponible : <strong>{fmt(potentialSavings)}</strong>
                   </p>
                 </div>
               ) : (
                 <div className="p-3 rounded-lg bg-red-900/20 border border-red-500/20">
                   <p className="text-xs text-red-300">
-                    ⚠️ Vos dépenses dépassent vos revenus de <strong>{fmt(Math.abs(summary?.potentialSavings || 0))}</strong>
+                    ⚠️ Vos comptes sont en négatif de <strong>{fmt(Math.abs(potentialSavings))}</strong>
                   </p>
                 </div>
               )}

@@ -34,14 +34,31 @@ export async function GET(request: Request) {
     const monthsWindow = Number(url.searchParams.get('monthsWindow') || '1') || 1
     const selectedMonth = url.searchParams.get('selectedMonth') // Format: YYYY-MM
 
-    // 1) récupérer comptes de l'utilisateur
-    const { data: accounts } = await supabase
+    // 1) récupérer comptes de l'utilisateur avec leurs soldes initiaux
+    const { data: accounts, error: accountsError } = await supabase
       .from('accounts')
-      .select('id')
+      .select('id, name, exclude_from_previsionnel, initial_balance')
       .eq('user_id', userId)
 
-    const accountIds = (accounts || []).map((a: { id: string }) => a.id)
-    if (accountIds.length === 0) return NextResponse.json({ error: 'Aucun compte trouvé' }, { status: 400 })
+    if (accountsError) {
+      console.error('Erreur récupération comptes:', accountsError)
+      return NextResponse.json({ error: 'Erreur récupération comptes' }, { status: 500 })
+    }
+
+    // Filtrer les comptes qui ne sont pas exclus du prévisionnel
+    const accountsIncluded = (accounts || []).filter((a) => a.exclude_from_previsionnel !== true)
+    const accountsExcluded = (accounts || []).filter((a) => a.exclude_from_previsionnel === true)
+    const accountIds = accountsIncluded.map((a) => a.id)
+    
+    // Calculer les totaux des soldes (utiliser initial_balance comme la page /comptes)
+    const totalBalanceIncluded = accountsIncluded.reduce((sum, a) => sum + Number(a.initial_balance || 0), 0)
+    const totalBalanceExcluded = accountsExcluded.reduce((sum, a) => sum + Number(a.initial_balance || 0), 0)
+    const totalBalanceAll = totalBalanceIncluded + totalBalanceExcluded
+    
+    // Compter les comptes exclus pour info
+    const excludedCount = accountsExcluded.length
+    
+    if (accountIds.length === 0) return NextResponse.json({ error: 'Aucun compte trouvé (ou tous exclus du prévisionnel)' }, { status: 400 })
 
     // 2) Déterminer les dates de début/fin en utilisant les clôtures
     let startDate: string | null = null
@@ -90,6 +107,12 @@ export async function GET(request: Request) {
     // 3) Récupérer les transactions selon la logique déterminée
     let txs
     let error
+    
+    // Date d'aujourd'hui pour le filtre optionnel
+    const today = new Date().toISOString().split('T')[0]
+    
+    // Paramètre pour inclure ou non les transactions futures
+    const includeFuture = url.searchParams.get('includeFuture') !== 'false' // par défaut true pour le prévisionnel
 
     if (useNonArchived) {
       // Récupérer les transactions non archivées
@@ -98,6 +121,11 @@ export async function GET(request: Request) {
         .select('amount,date,type,category:categories(name,type)')
         .in('account_id', accountIds)
         .neq('archived', true)
+      
+      // Si on ne veut pas les transactions futures, filtrer par date
+      if (!includeFuture) {
+        query = query.lte('date', today)
+      }
       
       // Si on a une date de début (lendemain de la clôture précédente), filtrer
       if (startDate) {
@@ -157,7 +185,6 @@ export async function GET(request: Request) {
         totalVariableExpenses += val
       }
     }
-
     // Dépenses variables (pour le budget)
     const variableTotals = Object.keys(sums).map(k => ({ 
       category: k, 
@@ -184,9 +211,13 @@ export async function GET(request: Request) {
         totalFixedExpenses: Number(totalFixedExpenses.toFixed(2)),
         totalVariableExpenses: Number(totalVariableExpenses.toFixed(2)),
         availableForVariable: Number((totalIncome - totalFixedExpenses).toFixed(2)),
-        potentialSavings: Number((totalIncome - totalFixedExpenses - totalVariableExpenses).toFixed(2))
+        potentialSavings: Number((totalIncome - totalFixedExpenses - totalVariableExpenses).toFixed(2)),
+        // Nouveaux champs basés sur les soldes des comptes
+        totalBalanceIncluded: Number(totalBalanceIncluded.toFixed(2)),
+        totalBalanceExcluded: Number(totalBalanceExcluded.toFixed(2)),
+        totalBalanceAll: Number(totalBalanceAll.toFixed(2))
       },
-      meta: { monthsWindow, startDate, endDate, useNonArchived } 
+      meta: { monthsWindow, startDate, endDate, useNonArchived, excludedAccountsCount: excludedCount } 
     })
   } catch (err) {
     console.error('Error /api/previsionnel/totals GET:', err)

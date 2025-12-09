@@ -24,6 +24,7 @@ export async function GET() {
       type: account.type,
       initialBalance: account.initial_balance,
       currentBalance: account.current_balance,
+      excludeFromPrevisionnel: account.exclude_from_previsionnel ?? false,
       isOwner: true,
       createdAt: account.created_at,
       updatedAt: account.updated_at,
@@ -98,9 +99,23 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json()
+    
+    // Construire dynamiquement l'objet de mise à jour
+    const updateData: Record<string, unknown> = {}
+    if (body.initialBalance !== undefined) {
+      updateData.initial_balance = body.initialBalance
+    }
+    if (body.excludeFromPrevisionnel !== undefined) {
+      updateData.exclude_from_previsionnel = body.excludeFromPrevisionnel
+    }
+    
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: 'Aucune donnée à mettre à jour' }, { status: 400 })
+    }
+    
     const { data: account, error } = await supabase
       .from('accounts')
-      .update({ initial_balance: body.initialBalance })
+      .update(updateData)
       .eq('id', body.id)
       .eq('user_id', userId)
       .select()
@@ -116,6 +131,7 @@ export async function PATCH(request: Request) {
       name: account.name,
       type: account.type,
       initialBalance: account.initial_balance,
+      excludeFromPrevisionnel: account.exclude_from_previsionnel ?? false,
       createdAt: account.created_at,
       updatedAt: account.updated_at,
     })

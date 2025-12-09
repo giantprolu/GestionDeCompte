@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Wallet, Save, Pencil, X, Share2, Plus, Trash2, CreditCard, PiggyBank, ChevronRight } from 'lucide-react'
+import { Wallet, Save, Pencil, X, Share2, Plus, Trash2, CreditCard, PiggyBank, ChevronRight, Calculator } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useUserSettings } from '@/components/AppWrapper'
 
@@ -18,6 +18,7 @@ interface Account {
   type: string
   initialBalance: number
   currentBalance?: number
+  excludeFromPrevisionnel?: boolean
   isOwner?: boolean
   permission?: 'view' | 'edit'
   shareId?: string
@@ -158,6 +159,37 @@ export default function ComptesPage() {
     } catch (error) {
       console.error('Erreur lors de la suppression:', error)
       alert('Erreur lors de la suppression du compte')
+    }
+  }
+
+  const handleTogglePrevisionnel = async (accountId: string, currentValue: boolean) => {
+    try {
+      const response = await fetch('/api/accounts', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: accountId,
+          excludeFromPrevisionnel: !currentValue,
+        }),
+      })
+
+      const data = await response.json()
+      
+      if (response.ok) {
+        // Recharger les comptes depuis le serveur pour avoir les vraies valeurs
+        await fetchAccounts()
+      } else {
+        // Afficher l'erreur - souvent c'est parce que la colonne n'existe pas en base
+        const errorMsg = data.error || 'Impossible de mettre à jour'
+        if (errorMsg.includes('exclude_from_previsionnel') || errorMsg.includes('column')) {
+          alert('Erreur: La colonne exclude_from_previsionnel n\'existe pas en base. Exécutez la migration SQL: ALTER TABLE accounts ADD COLUMN exclude_from_previsionnel BOOLEAN DEFAULT FALSE;')
+        } else {
+          alert('Erreur: ' + errorMsg)
+        }
+      }
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour:', error)
+      alert('Erreur lors de la mise à jour. Vérifiez que la migration SQL a été exécutée.')
     }
   }
 
@@ -523,6 +555,12 @@ export default function ComptesPage() {
                             }`}>
                               {account.type === 'ponctuel' ? 'Occasionnel' : 'Obligatoire'}
                             </span>
+                            {account.excludeFromPrevisionnel && (
+                              <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-300">
+                                <Calculator className="w-2.5 h-2.5" />
+                                Exclu prévisionnel
+                              </span>
+                            )}
                             <span className="text-[10px] sm:text-xs text-slate-500">
                               Initial: {(balances[account.id] ?? account.initialBalance).toFixed(2)} €
                             </span>
@@ -543,6 +581,19 @@ export default function ComptesPage() {
                         
                         {(account.isOwner || account.permission === 'edit') && (
                           <div className="flex items-center gap-1">
+                            <Button
+                              onClick={() => handleTogglePrevisionnel(account.id, account.excludeFromPrevisionnel || false)}
+                              variant="ghost"
+                              size="icon"
+                              title={account.excludeFromPrevisionnel ? 'Inclure dans le prévisionnel' : 'Exclure du prévisionnel'}
+                              className={`h-8 w-8 sm:h-10 sm:w-10 rounded-lg sm:rounded-xl border transition-all ${
+                                account.excludeFromPrevisionnel 
+                                  ? 'bg-orange-500/20 hover:bg-orange-500/30 border-orange-500/50 text-orange-400' 
+                                  : 'bg-slate-700/30 hover:bg-purple-500/20 border-slate-600/30 hover:border-purple-500/50 text-slate-400 hover:text-purple-400'
+                              }`}
+                            >
+                              <Calculator className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            </Button>
                             <Button
                               onClick={() => setEditingId(account.id)}
                               variant="ghost"
@@ -578,6 +629,7 @@ export default function ComptesPage() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3 }}
+        className="space-y-4"
       >
         <Card className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-blue-400/20">
           <CardContent className="py-5 px-6">
@@ -590,6 +642,23 @@ export default function ComptesPage() {
                 <p className="text-sm text-slate-400">
                   Le <strong className="text-blue-300">solde initial</strong> est le montant de départ. 
                   Le <strong className="text-green-300">solde actuel</strong> est calculé automatiquement en fonction de vos transactions.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-orange-400/20">
+          <CardContent className="py-5 px-6">
+            <div className="flex items-start gap-4">
+              <div className="p-2 rounded-xl bg-orange-500/20 shrink-0">
+                <Calculator className="w-5 h-5 text-orange-400" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-orange-300 mb-1">Exclusion du prévisionnel</h3>
+                <p className="text-sm text-slate-400">
+                  Cliquez sur l&apos;icône <Calculator className="w-4 h-4 inline text-orange-400" /> pour exclure un compte du calcul du prévisionnel. 
+                  <strong className="text-orange-300"> Utile pour les cartes ticket resto</strong> ou autres comptes que vous ne voulez pas inclure dans votre budget.
                 </p>
               </div>
             </div>
