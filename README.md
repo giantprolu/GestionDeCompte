@@ -19,8 +19,8 @@ Application complète de gestion financière personnelle avec système de transa
 - Statistiques mensuelles détaillées
 
 ### 🏦 Gestion des Comptes
-- **Compte Bourso** : Dépenses occasionnelles
-- **Compte Caisse EP** : Dépenses obligatoires mensuelles
+- **Compte A** : Dépenses occasionnelles
+- **Compte B** : Dépenses obligatoires mensuelles
 - Calcul automatique des soldes avec historique des transactions
 - Mise à jour des soldes initiaux
 
