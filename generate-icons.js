@@ -18,7 +18,6 @@ async function generateIcons() {
     .png()
     .toFile(path.join(publicDir, 'icon-192x192.png'));
   
-  console.log('Generated icon-192x192.png');
   
   // Generate 512x512
   await sharp(Buffer.from(svgContent))
@@ -26,7 +25,6 @@ async function generateIcons() {
     .png()
     .toFile(path.join(publicDir, 'icon-512x512.png'));
   
-  console.log('Generated icon-512x512.png');
   
   // Generate favicon
   await sharp(Buffer.from(svgContent))
@@ -34,7 +32,6 @@ async function generateIcons() {
     .png()
     .toFile(path.join(publicDir, 'favicon.png'));
   
-  console.log('Generated favicon.png');
 }
 
 generateIcons().catch(console.error);

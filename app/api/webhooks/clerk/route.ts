@@ -50,7 +50,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No user ID in event' }, { status: 400 })
     }
 
-    console.log(`🗑️ Suppression des données pour l'utilisateur: ${userId}`)
 
     try {
       // 1. Récupérer les IDs des comptes de l'utilisateur
@@ -143,7 +142,6 @@ export async function POST(request: NextRequest) {
 
       if (sharedWithError) console.error('Erreur suppression partages (shared_with):', sharedWithError)
 
-      console.log(`✅ Données supprimées pour l'utilisateur: ${userId}`)
 
       return NextResponse.json({ success: true, message: 'User data deleted' })
     } catch (error) {

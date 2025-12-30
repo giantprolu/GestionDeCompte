@@ -9,10 +9,8 @@ const staticAssets = [
 
 // Install event - cache only static assets
 self.addEventListener('install', (event) => {
-  console.log('[SW] Installing...');
   event.waitUntil(
     caches.open(STATIC_CACHE_NAME).then((cache) => {
-      console.log('[SW] Caching static assets');
       return cache.addAll(staticAssets);
     })
   );
@@ -22,20 +20,17 @@ self.addEventListener('install', (event) => {
 
 // Activate event - clean up ALL old caches
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           // Delete any cache that doesn't match current versions
           if (cacheName !== CACHE_NAME && cacheName !== STATIC_CACHE_NAME) {
-            console.log('[SW] Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
     }).then(() => {
-      console.log('[SW] Claiming clients');
       return self.clients.claim();
     })
   );
@@ -165,7 +160,6 @@ self.addEventListener('push', (event) => {
 
 // Notification click event
 self.addEventListener('notificationclick', (event) => {
-  console.log('[SW] Notification click received.');
   event.notification.close();
 
   const urlToOpen = event.notification.data?.url || '/';

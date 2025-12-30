@@ -162,7 +162,8 @@ export default function NotificationSettings() {
               whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.99 }}
               onClick={() => togglePreference(option.key)}
-              className="cursor-pointer"
+              className="cursor-pointer touch-target select-none"
+              style={{ WebkitTapHighlightColor: 'transparent' }}
             >
               <Card className={`
                 transition-all duration-300 border-2
@@ -179,11 +180,11 @@ export default function NotificationSettings() {
                     `}>
                       <Icon className={`w-5 h-5 ${isActive ? option.color : 'text-slate-400'}`} />
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-bold text-white">{option.title}</h3>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="font-bold text-white truncate">{option.title}</h3>
                         <div className={`
-                          w-12 h-6 rounded-full transition-all duration-300 flex items-center px-1
+                          w-12 h-6 rounded-full transition-all duration-300 flex items-center px-1 flex-shrink-0
                           ${isActive ? 'bg-emerald-600' : 'bg-slate-600'}
                         `}>
                           <motion.div
@@ -193,13 +194,13 @@ export default function NotificationSettings() {
                           />
                         </div>
                       </div>
-                      <p className="text-slate-400 text-sm mt-1">
+                      <p className="text-slate-400 text-sm mt-1 leading-snug">
                         {option.description}
                       </p>
                       
                       {/* Champ pour le seuil de solde bas */}
                       {option.hasThreshold && isActive && (
-                        <div className="mt-3 flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                        <div className="mt-3 flex items-center gap-2 relative z-10" onClick={e => e.stopPropagation()}>
                           <Label htmlFor="threshold" className="text-slate-300 text-sm whitespace-nowrap">
                             Seuil :
                           </Label>
@@ -211,7 +212,7 @@ export default function NotificationSettings() {
                               ...prev,
                               low_balance_threshold: parseFloat(e.target.value) || 0
                             }))}
-                            className="w-24 h-8 bg-slate-700 border-slate-600 text-white"
+                            className="w-24 h-9 bg-slate-900 border-slate-600 text-white"
                             min={0}
                             step={10}
                           />
@@ -227,20 +228,20 @@ export default function NotificationSettings() {
         })}
 
         {/* Bouton d'enregistrement */}
-        <div className="pt-4">
+        <div className="pt-4 pb-2">
           <Button
             onClick={savePreferences}
             disabled={isSaving}
-            className="w-full bg-emerald-600 hover:bg-emerald-700"
+            className="w-full bg-emerald-600 hover:bg-emerald-700 py-6 text-lg font-medium shadow-lg touch-target active:scale-[0.98] transition-transform"
           >
             {isSaving ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                 Enregistrement...
               </>
             ) : saveSuccess ? (
               <>
-                <Check className="w-4 h-4 mr-2" />
+                <Check className="w-5 h-5 mr-2" />
                 Enregistré !
               </>
             ) : (
@@ -249,8 +250,8 @@ export default function NotificationSettings() {
           </Button>
         </div>
 
-        <p className="text-xs text-slate-500 text-center mt-2">
-          Les notifications sont envoyées une seule fois par jour pour chaque alerte
+        <p className="text-xs text-slate-500 text-center">
+          Les notifications sont envoyées max une fois par jour par alerte
         </p>
       </CardContent>
     </Card>

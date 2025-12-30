@@ -1,0 +1,2 @@
+- revoir la méthode pour les notifications sur mobile car elle ne fonctionne pas
+- revoir le responsive pour pouvoir cliquer sur la cloche de notification sur mobile

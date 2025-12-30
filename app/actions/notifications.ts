@@ -59,7 +59,7 @@ export async function sendNotification(
   }
 
   const subscription = subscriptions.get(userId)
-  
+
   if (!subscription) {
     return { success: false, error: 'No subscription found' }
   }
@@ -93,7 +93,7 @@ export async function sendNotificationToAll(notification: {
   }
 
   const results = []
-  
+
   for (const [userId, subscription] of subscriptions) {
     try {
       await webpush.sendNotification(
@@ -111,6 +111,6 @@ export async function sendNotificationToAll(notification: {
       results.push({ userId, success: false })
     }
   }
-  
+
   return { success: true, results }
 }

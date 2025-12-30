@@ -157,20 +157,14 @@ export async function sendPushNotification(
   userId: string,
   notification: CriticalNotification
 ): Promise<{ success: boolean; error?: string }> {
-  try {
-    console.log('[sendPushNotification] Starting for user:', userId)
-    console.log('[sendPushNotification] vapidConfigured:', vapidConfigured)
-    
+  try {    
     if (!vapidConfigured) {
-      console.log('[sendPushNotification] VAPID not configured!')
       return { success: false, error: 'VAPID not configured' }
     }
 
     const subscriptions = await getUserSubscriptions(userId)
-    console.log('[sendPushNotification] Found subscriptions:', subscriptions.length)
     
     if (subscriptions.length === 0) {
-      console.log('[sendPushNotification] No subscriptions found for user')
       return { success: false, error: 'No subscriptions found' }
     }
 
@@ -184,18 +178,12 @@ export async function sendPushNotification(
       data: notification.data || {},
     })
 
-    console.log('[sendPushNotification] Sending to', subscriptions.length, 'subscriptions')
     const results = await Promise.allSettled(
       subscriptions.map(sub => webpush.sendNotification(sub, payload))
     )
 
     const successCount = results.filter(r => r.status === 'fulfilled').length
     const failedResults = results.filter(r => r.status === 'rejected')
-    
-    console.log('[sendPushNotification] Success:', successCount, '/', subscriptions.length)
-    if (failedResults.length > 0) {
-      console.log('[sendPushNotification] Failures:', failedResults.map(r => (r as PromiseRejectedResult).reason))
-    }
     
     if (successCount === 0) {
       return { success: false, error: 'All notifications failed' }

@@ -151,9 +151,6 @@ export default function Home() {
       const res = await fetch('/api/process-recurring', { method: 'POST' })
       if (res.ok) {
         const data = await res.json()
-        if (data.processed > 0) {
-          console.log(`${data.processed} transaction(s) récurrente(s) traitée(s)`)
-        }
       }
     } catch (error) {
       console.error('Erreur traitement récurrences:', error)

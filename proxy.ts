@@ -2,7 +2,11 @@ import { clerkMiddleware } from '@clerk/nextjs/server'
 
 // Middleware Clerk sans protection automatique
 // L'authentification est gérée via les modals dans les composants
-export default clerkMiddleware()
+export default clerkMiddleware(async (auth, req) => {
+  if (req.nextUrl.pathname.includes('/api/notifications')) {
+    const { userId } = await auth();
+  }
+})
 
 export const config = {
   matcher: [
