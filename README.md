@@ -203,14 +203,6 @@ Ouvrez [http://localhost:3000](http://localhost:3000)
 4. **Sélectionner la catégorie** : 24 catégories disponibles
 5. **Voir les statistiques** : Dashboard pour la vue d'ensemble
 
-## 🐛 Dépannage
-
-Si vous rencontrez des erreurs RLS (42501), consultez `MIGRATION-GUIDE.md` pour réinitialiser la base de données.
-
 ## 📄 License
 
 Projet personnel - Utilisation libre
-
----
-
-Développé avec ❤️ en Next.js et Supabase
