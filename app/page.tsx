@@ -13,6 +13,7 @@ import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { useUserSettings } from '@/components/AppWrapper'
+import { supabase } from '@/lib/db'
 
 interface Account {
   id: string
@@ -44,12 +45,20 @@ interface Transaction {
   archived?: boolean
 }
 
+// Nouvelle interface pour la clôture
+interface MonthClosure {
+  month_year: string;
+  start_date: string;
+  end_date: string;
+}
+
 export default function Home() {
-  const { isSignedIn, isLoaded } = useUser()
+  const { isSignedIn, isLoaded, user } = useUser()
   const router = useRouter()
   const { userType, isLoading: isLoadingSettings } = useUserSettings()
   const [accounts, setAccounts] = useState<Account[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [closures, setClosures] = useState<MonthClosure[]>([])
   const [loading, setLoading] = useState(true)
 
   // Rediriger les visionneurs vers la page partage
@@ -59,67 +68,67 @@ export default function Home() {
     }
   }, [userType, isLoadingSettings, router])
 
-  // Générer la liste des mois disponibles à partir des transactions
-  const allMonths = Array.from(new Set(transactions.map(txn => {
-    const d = new Date(txn.date)
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-  }))).sort().reverse()
-
-  // Utiliser le hook partagé pour le mois sélectionné
-  const { selectedMonth, toggleMonth, isCurrentMonth } = useSelectedMonth()
-
-  // Filtrer les transactions selon la période de clôture du mois sélectionné
-  const [monthClosure, setMonthClosureState] = useState<{ start_date: string, end_date: string } | null>(null)
-
-  // Mois courant
-  const currentMonth = getCurrentMonth()
-
+  // Récupérer toutes les clôtures de l'utilisateur dès que l'utilisateur est connecté
   useEffect(() => {
-    async function fetchClosure() {
-      // Récupérer l'utilisateur courant
-      const userId = accounts.find(acc => acc.ownerUserId)?.ownerUserId
-      if (!userId) return
-      
-      // Ne chercher la clôture que pour les mois passés
-      if (selectedMonth !== currentMonth) {
-        const closure = await getMonthClosure(userId, selectedMonth)
-        setMonthClosureState(closure)
-      } else {
-        setMonthClosureState(null)
+    async function fetchClosures() {
+      // Utilise le hook useUser pour récupérer l'id utilisateur
+      const userId = user?.id;
+      // Fallback sur accounts si user n'est pas dispo
+      const fallbackId = accounts.find(acc => acc.ownerUserId)?.ownerUserId;
+      const finalUserId = userId || fallbackId;
+      if (!finalUserId) return;
+      const { data, error } = await supabase
+        .from('month_closures')
+        .select('month_year, start_date, end_date')
+        .eq('user_id', finalUserId)
+        .order('start_date', { ascending: false });
+      if (!error && Array.isArray(data)) {
+        setClosures(data);
       }
     }
-    fetchClosure()
-  }, [selectedMonth, accounts, currentMonth])
+    if (isLoaded && isSignedIn && (user || accounts.length > 0)) {
+      fetchClosures();
+    }
+  }, [isLoaded, isSignedIn, accounts, user])
 
-  // Filtrer les transactions selon le mois sélectionné
-  const monthTransactions = (() => {
-    const today = new Date().toISOString().split('T')[0] // Date d'aujourd'hui au format YYYY-MM-DD
-    
-    // Pour le mois courant : transactions NON archivées ET pas dans le futur
-    if (selectedMonth === currentMonth) {
-      return transactions.filter(txn => !txn.archived && txn.date <= today)
-    }
-    
-    // Pour les mois passés avec une période de clôture
-    if (monthClosure) {
-      return transactions.filter(txn => 
-        txn.date >= monthClosure.start_date && 
-        txn.date <= monthClosure.end_date &&
-        txn.archived === true
-      )
-    }
-    
-    // Fallback : transactions archivées du mois sélectionné
-    return transactions.filter(txn => {
-      const txnMonth = txn.date ? txn.date.substring(0, 7) : ''
-      return txnMonth === selectedMonth && txn.archived === true
-    })
-  })()
+  // Générer la liste des périodes à partir des clôtures
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return '';
+    // Prend uniquement la partie date si le format est ISO
+    const baseDate = dateStr.split('T')[0];
+    const d = new Date(baseDate);
+    if (isNaN(d.getTime())) return baseDate;
+    return d.toLocaleDateString('fr-FR');
+  };
+  const allPeriods = closures.map(c => ({
+    key: c.month_year,
+    label: `${formatDate(c.start_date)} - ${formatDate(c.end_date)}`,
+    start_date: c.start_date,
+    end_date: c.end_date
+  }))
+
+  // Utiliser le hook partagé pour la période sélectionnée
+  const { selectedMonth, toggleMonth, isCurrentMonth } = useSelectedMonth()
+  const [selectedPeriod, setSelectedPeriod] = useState<string>(allPeriods[0]?.key || '')
+  const currentMonth = getCurrentMonth();
+  const [showCurrent, setShowCurrent] = useState(true);
+
+  // Filtrer les transactions selon la période sélectionnée
+  const currentClosure = allPeriods.find(p => p.key === selectedPeriod)
+  const periodTransactions = currentClosure
+    ? transactions.filter(txn => txn.date >= currentClosure.start_date && txn.date <= currentClosure.end_date && txn.archived === true)
+    : []
+
+  // Transactions pour la période sélectionnée ou le mois courant
+  const isCurrentSelected = showCurrent;
+  const filteredTransactions = isCurrentSelected
+    ? transactions.filter(txn => !txn.archived && txn.date.substring(0, 7) === currentMonth)
+    : periodTransactions;
 
   // Reset des indicateurs selon le mois sélectionné
-  const totalMonthIncome = monthTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0)
-  const totalMonthExpenses = monthTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0)
-  const expensesByCategory = monthTransactions.filter(t => t.type === 'expense').reduce((acc: Record<string, { amount: number, category: Category }>, txn) => {
+  const totalMonthIncome = filteredTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0)
+  const totalMonthExpenses = filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0)
+  const expensesByCategory = filteredTransactions.filter(t => t.type === 'expense').reduce((acc: Record<string, { amount: number, category: Category }>, txn) => {
     if (!acc[txn.categoryId]) {
       acc[txn.categoryId] = { amount: 0, category: txn.category }
     }
@@ -132,7 +141,7 @@ export default function Home() {
     color: item.category.color,
     icon: item.category.icon,
   })).sort((a, b) => b.value - a.value).slice(0, 5)
-  const recentTransactions = [...monthTransactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5)
+  const recentTransactions = [...filteredTransactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5)
 
   useEffect(() => {
     if (isLoaded && isSignedIn) {
@@ -256,64 +265,41 @@ export default function Home() {
               </div>
               
               <div className="flex gap-2 overflow-x-auto flex-1 pb-1 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent">
-                {allMonths.map((month, idx) => {
-                  const isSelected = month === selectedMonth
-                  const isCurrent = month === currentMonth
-                  const monthDate = new Date(month + '-01')
-                  const monthName = monthDate.toLocaleString('fr-FR', { month: 'short' })
-                  const year = monthDate.getFullYear().toString().slice(-2)
-                  
-                  return (
-                    <motion.button
-                      key={month}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: idx * 0.03 }}
-                      onClick={() => toggleMonth(month)}
-                      className={`relative flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 ${
-                        isSelected 
-                          ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-500/25' 
-                          : 'bg-slate-700/40 hover:bg-slate-700/70 text-slate-300 hover:text-white border border-slate-600/30 hover:border-slate-500/50'
-                      }`}
-                    >
-                      {isCurrent && (
-                        <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                          <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isSelected ? 'bg-green-300' : 'bg-green-500'}`}></span>
-                        </span>
-                      )}
-                      <span className={`text-sm font-semibold capitalize`}>
-                        {monthName} {year}
-                      </span>
-                    </motion.button>
-                  )
-                })}
-              </div>
-
-              {!isCurrentMonth && (
                 <motion.button
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  onClick={() => toggleMonth(currentMonth)}
-                  className="flex-shrink-0 px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-300 text-xs font-medium border border-blue-500/30 hover:bg-blue-500/30 transition-colors"
+                  key="current"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0 }}
+                  onClick={() => { setShowCurrent(true); setSelectedPeriod(''); }}
+                  className={`relative flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 ${
+                    showCurrent
+                      ? 'bg-gradient-to-r from-green-600 to-blue-600 text-white shadow-lg shadow-green-500/25'
+                      : 'bg-slate-700/40 hover:bg-slate-700/70 text-slate-300 hover:text-white border border-slate-600/30 hover:border-slate-500/50'
+                  }`}
                 >
-                  ← Actuel
+                  <span className={`text-sm font-semibold`}>Période actuelle</span>
                 </motion.button>
-              )}
+                {allPeriods.map((period, idx) => (
+                  <motion.button
+                    key={period.key}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: (idx + 1) * 0.03 }}
+                    onClick={() => { setShowCurrent(false); setSelectedPeriod(period.key); }}
+                    className={`relative flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 ${
+                      !showCurrent && selectedPeriod === period.key
+                        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-500/25'
+                        : 'bg-slate-700/40 hover:bg-slate-700/70 text-slate-300 hover:text-white border border-slate-600/30 hover:border-slate-500/50'
+                    }`}
+                  >
+                    <span className={`text-sm font-semibold`}>
+                      {period.label}
+                    </span>
+                  </motion.button>
+                ))}
+              </div>
             </div>
             
-            {!isCurrentMonth && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                className="mt-2 flex items-center gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg"
-              >
-                <Calendar className="w-4 h-4 text-amber-400" />
-                <p className="text-sm text-amber-200">
-                  Données de <span className="font-bold text-amber-100">{new Date(selectedMonth + '-01').toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}</span>
-                </p>
-              </motion.div>
-            )}
           </CardContent>
         </Card>
       </motion.div>
@@ -411,7 +397,7 @@ export default function Home() {
                 +{totalMonthIncome.toFixed(2)} €
               </div>
               <p className="text-xs text-slate-300 mt-1">
-                {monthTransactions.filter(t => t.type === 'income').length} transaction(s)
+                {filteredTransactions.filter(t => t.type === 'income').length} transaction(s)
               </p>
             </CardContent>
           </Card>
@@ -435,7 +421,7 @@ export default function Home() {
                 -{totalMonthExpenses.toFixed(2)} €
               </div>
               <p className="text-xs text-slate-300 mt-1">
-                {monthTransactions.filter(t => t.type === 'expense').length} transaction(s)
+                {filteredTransactions.filter(t => t.type === 'expense').length} transaction(s)
               </p>
             </CardContent>
           </Card>

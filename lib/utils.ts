@@ -24,7 +24,12 @@ export async function setMonthClosure(userId: string, monthYear: string, startDa
   const { error } = await supabase
     .from('month_closures')
     .upsert({ user_id: userId, month_year: monthYear, start_date: startDate, end_date: endDate })
-  if (error) throw error
+  if (error) {
+    if (error.code === '23505' && error.message && error.message.includes('unique_month_closure_per_user')) {
+      throw new Error('Une clôture existe déjà pour cette période et cet utilisateur. Impossible de créer un doublon.')
+    }
+    throw error
+  }
 }
 
 // Archive les transactions du mois précédent
@@ -69,9 +74,8 @@ export async function archivePreviousMonthTransactions(userId: string) {
   const firstDate = txsToArchive[0].date
   const lastDate = txsToArchive[txsToArchive.length - 1].date
 
-  // Calculer la période de clôture basée sur la première date
-  const d = new Date(firstDate)
-  const monthYear = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  // Générer un champ month_year unique basé sur la période
+  const monthYear = `${firstDate}_${lastDate}`
 
   // Enregistrer la période de clôture
   await setMonthClosure(userId, monthYear, firstDate, lastDate)

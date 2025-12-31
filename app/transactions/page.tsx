@@ -14,6 +14,7 @@ import RecurringTransactionForm from '@/components/RecurringTransactionForm'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Calendar, Wallet } from "lucide-react";
 import { useUserSettings } from '@/components/AppWrapper'
+import { supabase } from '@/lib/db'
 
 interface Account {
   id: string
@@ -45,8 +46,15 @@ interface Transaction {
   archived?: boolean
 }
 
+// Interface pour la clôture
+interface MonthClosure {
+  month_year: string;
+  start_date: string;
+  end_date: string;
+}
+
 export default function TransactionsPage() {
-  const { isSignedIn, isLoaded } = useUser()
+  const { isSignedIn, isLoaded, user } = useUser()
   const router = useRouter()
   const { userType, isLoading: isLoadingSettings } = useUserSettings()
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -57,6 +65,9 @@ export default function TransactionsPage() {
   const [formType, setFormType] = useState<'ponctuel' | 'recurrent'>('ponctuel')
   const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all')
   const [showUpcoming, setShowUpcoming] = useState(false)
+
+  useEffect(() => {
+  }, [showUpcoming]);
   const [showAllMonths, setShowAllMonths] = useState(false)
   const [search, setSearch] = useState('')
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
@@ -66,6 +77,9 @@ export default function TransactionsPage() {
   const [searchCategory, setSearchCategory] = useState('')
   const [searchAccount, setSearchAccount] = useState('')
   const [searchNote, setSearchNote] = useState('')
+  const [closures, setClosures] = useState<MonthClosure[]>([]);
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('current');
+  const [showCurrent, setShowCurrent] = useState(true);
 
   // Rediriger les visionneurs vers la page partage
   useEffect(() => {
@@ -111,7 +125,10 @@ export default function TransactionsPage() {
       
       const transactionsData = await transactionsRes.json()
       const accountsData = await accountsRes.json()
-      
+      // Affiche uniquement les transactions à venir (upcoming)
+      const upcoming = Array.isArray(transactionsData)
+        ? transactionsData.filter(txn => !txn.archived && new Date(txn.date) > new Date())
+        : [];
       setTransactions(Array.isArray(transactionsData) ? transactionsData : [])
       setAccounts(accountsData)
     } catch (error) {
@@ -121,10 +138,63 @@ export default function TransactionsPage() {
     }
   }
 
+  // Charger toutes les clôtures pour l'utilisateur
+  useEffect(() => {
+    async function fetchClosures() {
+      // Utilise le hook useUser pour récupérer l'id utilisateur
+      const userId = user?.id;
+      if (!userId) return;
+      const { data, error } = await supabase
+        .from('month_closures')
+        .select('month_year, start_date, end_date')
+        .eq('user_id', userId)
+        .order('start_date', { ascending: false });
+      if (!error && Array.isArray(data)) {
+        setClosures(data);
+      }
+    }
+    if (isLoaded && isSignedIn && user) {
+      fetchClosures();
+    }
+  }, [isLoaded, isSignedIn, user]);
+
+  // Liste des périodes
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return '';
+    const baseDate = dateStr.split('T')[0];
+    const d = new Date(baseDate);
+    if (isNaN(d.getTime())) return baseDate;
+    return d.toLocaleDateString('fr-FR');
+  };
+  const allPeriods = closures.map(c => ({
+    key: c.month_year,
+    label: `${formatDate(c.start_date)} - ${formatDate(c.end_date)}`,
+    start_date: c.start_date,
+    end_date: c.end_date
+  }));
+
+  // Filtrer les transactions selon la période sélectionnée
+  const currentMonth = getCurrentMonth();
+  const currentClosure = allPeriods.find(p => p.key === selectedPeriod);
+  // Afficher toutes les transactions du mois courant (y compris à venir, non archivées)
+  const filteredTransactions = showCurrent
+    ? transactions.filter(txn => {
+        if (txn.archived) return false;
+        // Si showUpcoming est activé, on inclut toutes les transactions à venir (date future), même hors du mois courant
+        if (showUpcoming && new Date(txn.date) > new Date()) return true;
+        // Sinon, on filtre sur le mois courant
+        if (txn.date.substring(0, 7) !== currentMonth) return false;
+        if (!showUpcoming && new Date(txn.date) > new Date()) return false;
+        return true;
+      })
+    : currentClosure
+      ? transactions.filter(txn => txn.date >= currentClosure.start_date && txn.date <= currentClosure.end_date && txn.archived === true)
+      : [];
+
   // Filtrer les transactions côté client
   // Filtrage selon la période de clôture du mois sélectionné
   const [monthClosure, setMonthClosureState] = useState<{ start_date: string, end_date: string } | null>(null)
-  const currentMonth = getCurrentMonth()
+  const currentMonthCheck = getCurrentMonth()
 
   useEffect(() => {
     async function fetchClosure() {
@@ -132,7 +202,7 @@ export default function TransactionsPage() {
       if (!userId) return
       
       // Ne chercher la clôture que pour les mois passés
-      if (selectedMonth !== currentMonth) {
+      if (selectedMonth !== currentMonthCheck) {
         const closure = await getMonthClosure(userId, selectedMonth)
         setMonthClosureState(closure)
       } else {
@@ -140,78 +210,41 @@ export default function TransactionsPage() {
       }
     }
     fetchClosure()
-  }, [selectedMonth, accounts, currentMonth])
+  }, [selectedMonth, accounts, currentMonthCheck])
 
-  // Filtrer les transactions selon le mois sélectionné et le mode "Tous mois"
-  const filteredTransactions = (() => {
-    let filtered = transactions
-
-    // Si "Tous mois" est actif, montrer toutes les transactions non archivées
-    if (showAllMonths) {
-      filtered = transactions.filter(txn => !txn.archived)
-    } else if (selectedMonth === currentMonth) {
-      // Pour le mois courant : transactions NON archivées
-      // Mais on garde les futures pour l'affichage si showUpcoming est actif
-      filtered = transactions.filter(txn => !txn.archived)
-    } else if (monthClosure) {
-      // Pour les mois passés avec une période de clôture
-      filtered = transactions.filter(txn => 
-        txn.date >= monthClosure.start_date && 
-        txn.date <= monthClosure.end_date &&
-        txn.archived === true
-      )
-    } else {
-      // Fallback pour mois passé sans clôture : transactions archivées du mois sélectionné
-      filtered = transactions.filter(txn => {
-        const txnMonth = txn.date ? txn.date.substring(0, 7) : ''
-        return txnMonth === selectedMonth && txn.archived === true
-      })
+  // Appliquer les filtres supplémentaires
+  const finalFilteredTransactions = filteredTransactions.filter(txn => {
+    if (typeFilter !== 'all' && txn.type !== typeFilter) return false;
+    if (search.trim() !== '') {
+      const lower = search.trim().toLowerCase();
+      const fields = [
+        txn.category?.name,
+        txn.category?.icon,
+        txn.account?.name,
+        txn.note,
+        txn.amount?.toString(),
+        txn.date
+      ].map(v => (v || '').toString().toLowerCase());
+      if (!fields.some(f => f.includes(lower))) return false;
     }
-
-    // Filtrer les transactions futures si showUpcoming n'est pas actif
-    const today = new Date().toISOString().split('T')[0]
-    if (!showUpcoming) {
-      filtered = filtered.filter(txn => {
-        // Normaliser la date de la transaction (prendre seulement YYYY-MM-DD)
-        const txnDate = txn.date ? txn.date.split('T')[0] : ''
-        return txnDate <= today
-      })
+    if (searchDate.trim() !== '') {
+      const dateStr = new Date(txn.date).toISOString().split('T')[0];
+      if (!dateStr.includes(searchDate.trim())) return false;
     }
-
-    // Appliquer les filtres supplémentaires
-    return filtered.filter(txn => {
-      if (typeFilter !== 'all' && txn.type !== typeFilter) return false
-      if (search.trim() !== '') {
-        const lower = search.trim().toLowerCase()
-        const fields = [
-          txn.category?.name,
-          txn.category?.icon,
-          txn.account?.name,
-          txn.note,
-          txn.amount?.toString(),
-          txn.date
-        ].map(v => (v || '').toString().toLowerCase())
-        if (!fields.some(f => f.includes(lower))) return false
-      }
-      if (searchDate.trim() !== '') {
-        const dateStr = new Date(txn.date).toISOString().split('T')[0]
-        if (!dateStr.includes(searchDate.trim())) return false
-      }
-      if (searchAmount.trim() !== '') {
-        if (!txn.amount.toString().includes(searchAmount.trim())) return false
-      }
-      if (searchCategory.trim() !== '') {
-        if (!txn.category?.name?.toLowerCase().includes(searchCategory.trim().toLowerCase())) return false
-      }
-      if (searchAccount.trim() !== '') {
-        if (!txn.account?.name?.toLowerCase().includes(searchAccount.trim().toLowerCase())) return false
-      }
-      if (searchNote.trim() !== '') {
-        if (!txn.note?.toLowerCase().includes(searchNote.trim().toLowerCase())) return false
-      }
-      return true
-    })
-  })()
+    if (searchAmount.trim() !== '') {
+      if (!txn.amount.toString().includes(searchAmount.trim())) return false;
+    }
+    if (searchCategory.trim() !== '') {
+      if (!txn.category?.name?.toLowerCase().includes(searchCategory.trim().toLowerCase())) return false;
+    }
+    if (searchAccount.trim() !== '') {
+      if (!txn.account?.name?.toLowerCase().includes(searchAccount.trim().toLowerCase())) return false;
+    }
+    if (searchNote.trim() !== '') {
+      if (!txn.note?.toLowerCase().includes(searchNote.trim().toLowerCase())) return false;
+    }
+    return true;
+  });
 
   const handleDeleteTransaction = async (id: string) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cette transaction ?')) return
@@ -288,17 +321,19 @@ export default function TransactionsPage() {
   const today = new Date().toISOString().split('T')[0]
 
   // Calculer les totaux en excluant les transactions futures
-  const transactionsForTotals = filteredTransactions.filter(t => t.date <= today)
 
-  const totalIncome = transactionsForTotals
+  // Calcul des totaux sur la liste affichée (comme sur le Dashboard)
+  const totalIncome = finalFilteredTransactions
     .filter(t => t.type === 'income')
     .reduce((sum, t) => sum + t.amount, 0)
 
-  const totalExpense = transactionsForTotals
+  const totalExpense = finalFilteredTransactions
     .filter(t => t.type === 'expense')
     .reduce((sum, t) => sum + t.amount, 0)
 
   const balance = totalIncome - totalExpense
+
+
 
   if (loading) {
     return <div className="text-center py-12">Chargement...</div>
@@ -310,6 +345,40 @@ export default function TransactionsPage() {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-4 md:space-y-6 pb-20 md:pb-8 px-3 sm:px-4 md:px-6 pt-4"
     >
+      {/* Sélecteur de période */}
+      <div className="flex gap-2 overflow-x-auto pb-3 mb-3">
+        <motion.button
+          key="current"
+          initial={{ opacity: 0, x: -10 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0 }}
+          onClick={() => { setShowCurrent(true); setSelectedPeriod('current'); }}
+          className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 ${
+            showCurrent
+              ? 'bg-gradient-to-r from-green-600 to-blue-600 text-white shadow-lg shadow-green-500/25'
+              : 'bg-slate-700/40 hover:bg-slate-700/70 text-slate-300 hover:text-white border border-slate-600/30 hover:border-slate-500/50'
+          }`}
+        >
+          <span className="text-sm font-semibold">Période actuelle</span>
+        </motion.button>
+        {allPeriods.map((period, idx) => (
+          <motion.button
+            key={period.key}
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: (idx + 1) * 0.03 }}
+            onClick={() => { setShowCurrent(false); setSelectedPeriod(period.key); }}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 ${
+              !showCurrent && selectedPeriod === period.key
+                ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-500/25'
+                : 'bg-slate-700/40 hover:bg-slate-700/70 text-slate-300 hover:text-white border border-slate-600/30 hover:border-slate-500/50'
+            }`}
+          >
+            <span className="text-sm font-semibold">{period.label}</span>
+          </motion.button>
+        ))}
+      </div>
+
       {/* Indicateur du mois affiché */}
       {!isCurrentMonth && !showAllMonths && (
         <div className="bg-amber-500/20 border border-amber-500/50 rounded-lg p-3">
@@ -524,7 +593,7 @@ export default function TransactionsPage() {
             </p>
           ) : (
             <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent">
-              {filteredTransactions.map((transaction) => {
+              {finalFilteredTransactions.map((transaction) => {
                 const isFuture = new Date(transaction.date) > new Date()
                 return (
                 <motion.div
@@ -604,7 +673,7 @@ export default function TransactionsPage() {
           )}
         </CardContent>
       </Card>
-
+          
       {/* Modal d'édition */}
       {editingTransaction && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
