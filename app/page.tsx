@@ -119,10 +119,20 @@ export default function Home() {
     ? transactions.filter(txn => txn.date >= currentClosure.start_date && txn.date <= currentClosure.end_date && txn.archived === true)
     : []
 
-  // Transactions pour la période sélectionnée ou le mois courant
+  // Transactions pour la période sélectionnée ou la période actuelle
+  // La période actuelle = depuis le jour après la dernière clôture jusqu'à aujourd'hui
   const isCurrentSelected = showCurrent;
+  const lastClosureEndDate = allPeriods.length > 0 ? allPeriods[0].end_date : null;
   const filteredTransactions = isCurrentSelected
-    ? transactions.filter(txn => !txn.archived && txn.date.substring(0, 7) === currentMonth)
+    ? transactions.filter(txn => {
+        if (txn.archived) return false;
+        // Si on a une clôture, on prend les transactions après la date de fin de la dernière clôture
+        if (lastClosureEndDate) {
+          return txn.date > lastClosureEndDate;
+        }
+        // Sinon, on prend toutes les transactions non archivées
+        return true;
+      })
     : periodTransactions;
 
   // Reset des indicateurs selon le mois sélectionné

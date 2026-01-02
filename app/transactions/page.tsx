@@ -176,14 +176,22 @@ export default function TransactionsPage() {
   // Filtrer les transactions selon la période sélectionnée
   const currentMonth = getCurrentMonth();
   const currentClosure = allPeriods.find(p => p.key === selectedPeriod);
-  // Afficher toutes les transactions du mois courant (y compris à venir, non archivées)
+  // La période actuelle = depuis le jour après la dernière clôture jusqu'à aujourd'hui (ou futures si showUpcoming)
+  const lastClosureEndDate = allPeriods.length > 0 ? allPeriods[0].end_date : null;
   const filteredTransactions = showCurrent
     ? transactions.filter(txn => {
         if (txn.archived) return false;
-        // Si showUpcoming est activé, on inclut toutes les transactions à venir (date future), même hors du mois courant
+        // Si showUpcoming est activé, on inclut toutes les transactions à venir (date future)
         if (showUpcoming && new Date(txn.date) > new Date()) return true;
-        // Sinon, on filtre sur le mois courant
-        if (txn.date.substring(0, 7) !== currentMonth) return false;
+        // Si on a une clôture, on prend les transactions après la date de fin de la dernière clôture
+        if (lastClosureEndDate) {
+          // Transaction doit être après la dernière clôture
+          if (txn.date <= lastClosureEndDate) return false;
+          // Si pas showUpcoming, exclure les transactions futures
+          if (!showUpcoming && new Date(txn.date) > new Date()) return false;
+          return true;
+        }
+        // Sinon (pas de clôture), on prend toutes les transactions non archivées jusqu'à aujourd'hui
         if (!showUpcoming && new Date(txn.date) > new Date()) return false;
         return true;
       })
@@ -379,15 +387,7 @@ export default function TransactionsPage() {
         ))}
       </div>
 
-      {/* Indicateur du mois affiché */}
-      {!isCurrentMonth && !showAllMonths && (
-        <div className="bg-amber-500/20 border border-amber-500/50 rounded-lg p-3">
-          <p className="text-sm text-amber-400">
-            📅 Vous visualisez les transactions archivées de {new Date(selectedMonth + '-01').toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}.
-            Changez de mois depuis le Dashboard ou activez &quot;Tous mois&quot;.
-          </p>
-        </div>
-      )}
+      
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <h1 className="text-3xl md:text-4xl font-bold text-white drop-shadow-lg">Transactions</h1>
         <Button 
