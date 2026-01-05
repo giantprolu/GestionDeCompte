@@ -32,6 +32,7 @@ export default function ComptesPage() {
   const [loading, setLoading] = useState(true)
   const [balances, setBalances] = useState<Record<string, number>>({})
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingValue, setEditingValue] = useState<string>('')
   
   // Rediriger les visionneurs vers la page partage
   useEffect(() => {
@@ -44,7 +45,7 @@ export default function ComptesPage() {
   const [showAddForm, setShowAddForm] = useState(false)
   const [newAccountName, setNewAccountName] = useState('')
   const [newAccountType, setNewAccountType] = useState<'ponctuel' | 'obligatoire'>('ponctuel')
-  const [newAccountBalance, setNewAccountBalance] = useState(0)
+  const [newAccountBalance, setNewAccountBalance] = useState('')
   const [isCreating, setIsCreating] = useState(false)
 
   useEffect(() => {
@@ -82,14 +83,20 @@ export default function ComptesPage() {
       return getBaseInitial(account, balances)
     }
 
+  const startEditing = (accountId: string, currentBalance: number) => {
+    setEditingId(accountId)
+    setEditingValue(currentBalance.toString().replace('.', ','))
+  }
+
   const handleUpdateBalance = async (accountId: string) => {
+    const numericValue = parseFloat(editingValue.replace(',', '.')) || 0
     try {
       const response = await fetch('/api/accounts', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: accountId,
-          initialBalance: balances[accountId],
+          initialBalance: numericValue,
         }),
       })
 
@@ -117,14 +124,14 @@ export default function ComptesPage() {
         body: JSON.stringify({
           name: newAccountName.trim(),
           type: newAccountType,
-          initialBalance: newAccountBalance,
+          initialBalance: parseFloat(newAccountBalance.replace(',', '.')) || 0,
         }),
       })
 
       if (response.ok) {
         setNewAccountName('')
         setNewAccountType('ponctuel')
-        setNewAccountBalance(0)
+        setNewAccountBalance('')
         setShowAddForm(false)
         fetchAccounts()
       } else {
@@ -349,9 +356,11 @@ export default function ComptesPage() {
                       inputMode="decimal"
                       value={newAccountBalance}
                       onChange={(e) => {
-                        const value = e.target.value.replace(',', '.')
-                        setNewAccountBalance(parseFloat(value) || 0)
+                        // Autoriser chiffres, virgule et point uniquement
+                        const value = e.target.value.replace(/[^0-9.,]/g, '')
+                        setNewAccountBalance(value)
                       }}
+                      placeholder="0"
                       className="bg-slate-700/50 border-slate-600/50 text-white h-12 text-lg font-semibold pr-12 focus:border-green-500 focus:ring-green-500/20"
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-semibold">€</span>
@@ -456,13 +465,11 @@ export default function ComptesPage() {
                         <Input
                           type="text"
                           inputMode="decimal"
-                          value={balances[account.id] || 0}
+                          value={editingValue}
                           onChange={(e) => {
-                            const value = e.target.value.replace(',', '.')
-                            setBalances({
-                              ...balances,
-                              [account.id]: parseFloat(value) || 0,
-                            })
+                            // Autoriser chiffres, virgule et point uniquement
+                            const value = e.target.value.replace(/[^0-9.,]/g, '')
+                            setEditingValue(value)
                           }}
                           className="bg-slate-700/50 border-slate-600/50 text-white text-2xl font-bold h-16 pr-12 focus:border-blue-500 focus:ring-blue-500/20"
                           autoFocus
@@ -481,10 +488,7 @@ export default function ComptesPage() {
                         <Button
                           onClick={() => {
                             setEditingId(null)
-                            setBalances({
-                              ...balances,
-                              [account.id]: account.initialBalance,
-                            })
+                            setEditingValue('')
                           }}
                           variant="outline"
                           className="h-12 px-6 bg-slate-700/50 border-slate-600/50 text-white hover:bg-slate-700"
@@ -548,7 +552,7 @@ export default function ComptesPage() {
                         {(account.isOwner || account.permission === 'edit') && (
                           <div className="flex items-center gap-1">
                             <Button
-                              onClick={() => setEditingId(account.id)}
+                              onClick={() => startEditing(account.id, balances[account.id] ?? account.initialBalance)}
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg sm:rounded-xl bg-slate-700/30 hover:bg-blue-500/20 border border-slate-600/30 hover:border-blue-500/50 text-slate-400 hover:text-blue-400 transition-all"
