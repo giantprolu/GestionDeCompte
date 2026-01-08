@@ -5,6 +5,7 @@ import { auth } from '@clerk/nextjs/server'
 /**
  * API pour traiter les transactions récurrentes du jour
  * - Trouve toutes les transactions récurrentes actives dont la date est aujourd'hui ou passée
+ * - Vérifie qu'elles n'ont pas déjà été traitées pour cette date
  * - Met à jour le solde du compte
  * - Crée une copie de la transaction pour la conserver dans l'historique
  * - Reprogramme la transaction originale pour la prochaine occurrence
@@ -52,10 +53,48 @@ export async function POST() {
     }
 
     let processed = 0
+    let skipped = 0
     const results: Array<{ id: string; name: string; nextDate: string }> = []
 
     for (const txn of recurringTransactions) {
       try {
+        const txnDate = txn.date
+        const lastProcessed = txn.last_processed_date
+        
+        // ANTI-DUPLICATA: Vérifier si cette transaction a déjà été traitée pour cette date
+        // Si last_processed_date >= date de la transaction, on l'a déjà traitée
+        if (lastProcessed && lastProcessed >= txnDate) {
+          skipped++
+          continue
+        }
+
+        // Vérifier qu'une copie n'existe pas déjà pour cette date (protection supplémentaire)
+        const { data: existingCopy } = await supabase
+          .from('transactions')
+          .select('id')
+          .eq('account_id', txn.account_id)
+          .eq('category_id', txn.category_id)
+          .eq('amount', txn.amount)
+          .eq('date', txn.date)
+          .eq('is_recurring', false)
+          .like('note', '%(récurrent)%')
+          .limit(1)
+        
+        if (existingCopy && existingCopy.length > 0) {
+          // Une copie existe déjà, passer à la date suivante sans créer de doublon
+          skipped++
+          // Quand même mettre à jour la date pour la prochaine occurrence
+          const nextDate = calculateNextDate(txn)
+          await supabase
+            .from('transactions')
+            .update({ 
+              date: nextDate,
+              last_processed_date: txn.date
+            })
+            .eq('id', txn.id)
+          continue
+        }
+
         // 1. Mettre à jour le solde du compte
         const account = txn.account as { id: string; initial_balance: number; name: string }
         const currentBalance = account.initial_balance || 0
@@ -90,44 +129,15 @@ export async function POST() {
           })
 
         // 3. Calculer la prochaine date selon la fréquence
-        const currentDate = new Date(txn.date)
-        let nextDate: Date
-
-        switch (txn.recurrence_frequency) {
-          case 'daily':
-            nextDate = new Date(currentDate)
-            nextDate.setDate(nextDate.getDate() + 1)
-            break
-          case 'weekly':
-            nextDate = new Date(currentDate)
-            nextDate.setDate(nextDate.getDate() + 7)
-            break
-          case 'monthly':
-            nextDate = new Date(currentDate)
-            nextDate.setMonth(nextDate.getMonth() + 1)
-            // Gérer les cas où le jour n'existe pas (ex: 31 février)
-            if (txn.recurrence_day) {
-              const targetDay = txn.recurrence_day
-              const maxDay = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 0).getDate()
-              nextDate.setDate(Math.min(targetDay, maxDay))
-            }
-            break
-          case 'yearly':
-            nextDate = new Date(currentDate)
-            nextDate.setFullYear(nextDate.getFullYear() + 1)
-            break
-          default:
-            // Par défaut, mensuel
-            nextDate = new Date(currentDate)
-            nextDate.setMonth(nextDate.getMonth() + 1)
-        }
-
-        // 4. Mettre à jour la date de la transaction récurrente pour la prochaine occurrence
-        const nextDateStr = nextDate.toISOString().split('T')[0]
+        const nextDateStr = calculateNextDate(txn)
         
+        // 4. Mettre à jour la date de la transaction récurrente et marquer comme traitée
         await supabase
           .from('transactions')
-          .update({ date: nextDateStr })
+          .update({ 
+            date: nextDateStr,
+            last_processed_date: txn.date // Marquer la date actuelle comme traitée
+          })
           .eq('id', txn.id)
 
         processed++
@@ -145,7 +155,8 @@ export async function POST() {
 
     return NextResponse.json({
       processed,
-      message: `${processed} transaction(s) récurrente(s) traitée(s)`,
+      skipped,
+      message: `${processed} transaction(s) récurrente(s) traitée(s)${skipped > 0 ? `, ${skipped} ignorée(s)` : ''}`,
       results,
     })
 
@@ -153,6 +164,43 @@ export async function POST() {
     console.error('Erreur process-recurring:', error)
     return NextResponse.json({ error: 'Erreur lors du traitement des transactions récurrentes' }, { status: 500 })
   }
+}
+
+// Fonction helper pour calculer la prochaine date
+function calculateNextDate(txn: { date: string; recurrence_frequency: string; recurrence_day?: number }): string {
+  const currentDate = new Date(txn.date)
+  let nextDate: Date
+
+  switch (txn.recurrence_frequency) {
+    case 'daily':
+      nextDate = new Date(currentDate)
+      nextDate.setDate(nextDate.getDate() + 1)
+      break
+    case 'weekly':
+      nextDate = new Date(currentDate)
+      nextDate.setDate(nextDate.getDate() + 7)
+      break
+    case 'monthly':
+      nextDate = new Date(currentDate)
+      nextDate.setMonth(nextDate.getMonth() + 1)
+      // Gérer les cas où le jour n'existe pas (ex: 31 février)
+      if (txn.recurrence_day) {
+        const targetDay = txn.recurrence_day
+        const maxDay = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 0).getDate()
+        nextDate.setDate(Math.min(targetDay, maxDay))
+      }
+      break
+    case 'yearly':
+      nextDate = new Date(currentDate)
+      nextDate.setFullYear(nextDate.getFullYear() + 1)
+      break
+    default:
+      // Par défaut, mensuel
+      nextDate = new Date(currentDate)
+      nextDate.setMonth(nextDate.getMonth() + 1)
+  }
+
+  return nextDate.toISOString().split('T')[0]
 }
 
 // GET pour vérifier les transactions récurrentes en attente

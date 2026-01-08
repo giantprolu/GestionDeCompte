@@ -23,6 +23,7 @@ interface NotificationPreferences {
   low_balance: boolean
   low_balance_threshold: number
   upcoming_recurring: boolean
+  upcoming_recurring_days: number
 }
 
 // Récupérer les préférences de notification d'un utilisateur
@@ -41,6 +42,7 @@ async function getUserNotificationPreferences(userId: string): Promise<Notificat
         low_balance: true,
         low_balance_threshold: 100,
         upcoming_recurring: true,
+        upcoming_recurring_days: 3,
       }
     }
 
@@ -49,6 +51,7 @@ async function getUserNotificationPreferences(userId: string): Promise<Notificat
       low_balance: data.low_balance ?? true,
       low_balance_threshold: data.low_balance_threshold ?? 100,
       upcoming_recurring: data.upcoming_recurring ?? true,
+      upcoming_recurring_days: data.upcoming_recurring_days ?? 3,
     }
   } catch {
     return {
@@ -56,6 +59,7 @@ async function getUserNotificationPreferences(userId: string): Promise<Notificat
       low_balance: true,
       low_balance_threshold: 100,
       upcoming_recurring: true,
+      upcoming_recurring_days: 3,
     }
   }
 }
@@ -233,7 +237,7 @@ export async function checkAndSendCriticalNotifications(userId: string) {
 
     // 2. Vérifier les transactions récurrentes à venir
     if (prefs.upcoming_recurring) {
-      const recurringTransactions = await getUpcomingRecurringTransactions(userId)
+      const recurringTransactions = await getUpcomingRecurringTransactions(userId, prefs.upcoming_recurring_days)
       
       for (const txn of recurringTransactions) {
         const result = await notifyUpcomingRecurring(
