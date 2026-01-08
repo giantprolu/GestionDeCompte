@@ -1,0 +1,2 @@
+- il faut gérer que si un user supprime son compte clerk toutes ses données doivent être deleted en base
+- il faut gérer le changement clerk de dev vers prod car l'app est connecté a clerk mais elle a des users en dev et pas encore en prod mais il faut récuperer les user clerk en dev et les transférer en prod sans rien perdre
