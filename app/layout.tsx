@@ -1,12 +1,14 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Sidebar from "@/components/Sidebar" ;
+import Sidebar from "@/components/Sidebar";
 import AuthGuard from "@/components/AuthGuard";
 import { ClerkProvider } from "@clerk/nextjs";
 import { frFR } from "@clerk/localizations";
 import AppWrapper from "@/components/AppWrapper";
 import PWAInstallPrompt from "@/components/PWAInstallPrompt";
+import { TutorialWrapper } from "@/components/tutorial/TutorialWrapper";
+import TutorialAutoStart from "@/components/TutorialAutoStart";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -63,9 +65,12 @@ export default function RootLayout({
         >
           <AuthGuard>
             <AppWrapper>
-              <Sidebar>
-                {children}
-              </Sidebar>
+              <TutorialWrapper>
+                <TutorialAutoStart />
+                <Sidebar>
+                  {children}
+                </Sidebar>
+              </TutorialWrapper>
             </AppWrapper>
           </AuthGuard>
           <PWAInstallPrompt />
@@ -74,3 +79,4 @@ export default function RootLayout({
     </ClerkProvider>
   );
 }
+

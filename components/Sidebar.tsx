@@ -10,7 +10,7 @@ import { useUserSettings } from '@/components/AppWrapper'
 import { motion, AnimatePresence } from 'framer-motion'
 
 // Hook pour détecter si on est côté client (évite hydration mismatch)
-const emptySubscribe = () => () => {}
+const emptySubscribe = () => () => { }
 function useIsMounted() {
   return useSyncExternalStore(
     emptySubscribe,
@@ -114,11 +114,11 @@ export default function Sidebar({ children }: SidebarProps) {
         </div>
 
         {/* Navigation */}
-        <nav className="space-y-2 flex-1">
+        <nav className="space-y-2 flex-1" data-tutorial="sidebar-nav">
           {filteredNavItems.map((item) => {
             const Icon = item.icon
             const isActive = pathname === item.href
-            
+
             return (
               <Link
                 key={item.href}
@@ -170,7 +170,7 @@ export default function Sidebar({ children }: SidebarProps) {
               onClick={() => setMobileMenuOpen(false)}
               className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
             />
-            
+
             {/* Menu Drawer */}
             <motion.div
               initial={{ x: '100%' }}
@@ -245,12 +245,12 @@ export default function Sidebar({ children }: SidebarProps) {
       </AnimatePresence>
 
       {/* Bottom Navigation Mobile - avec support safe area Android/iOS */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 glass border-t border-white/10 backdrop-blur-xl mobile-nav safe-left safe-right">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 glass border-t border-white/10 backdrop-blur-xl mobile-nav safe-left safe-right" data-tutorial="mobile-nav">
         <div className="flex items-center justify-around px-2 xs:px-4 pt-2 pb-1">
           {filteredNavItems.map((item) => {
             const Icon = item.icon
             const isActive = pathname === item.href
-            
+
             return (
               <Link
                 key={item.href}

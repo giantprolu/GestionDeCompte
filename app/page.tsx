@@ -125,14 +125,14 @@ export default function Home() {
   const lastClosureEndDate = allPeriods.length > 0 ? allPeriods[0].end_date : null;
   const filteredTransactions = isCurrentSelected
     ? transactions.filter(txn => {
-        if (txn.archived) return false;
-        // Si on a une clôture, on prend les transactions après la date de fin de la dernière clôture
-        if (lastClosureEndDate) {
-          return txn.date > lastClosureEndDate;
-        }
-        // Sinon, on prend toutes les transactions non archivées
-        return true;
-      })
+      if (txn.archived) return false;
+      // Si on a une clôture, on prend les transactions après la date de fin de la dernière clôture
+      if (lastClosureEndDate) {
+        return txn.date > lastClosureEndDate;
+      }
+      // Sinon, on prend toutes les transactions non archivées
+      return true;
+    })
     : periodTransactions;
 
   // Reset des indicateurs selon le mois sélectionné
@@ -182,13 +182,13 @@ export default function Home() {
         fetch('/api/accounts'),
         fetch('/api/expenses'),
       ])
-      
+
       if (!accountsRes.ok || !transactionsRes.ok) {
         console.error('Erreur API:', accountsRes.status, transactionsRes.status)
         setLoading(false)
         return
       }
-      
+
       const accountsData = await accountsRes.json()
       const transactionsData = await transactionsRes.json()
       setAccounts(Array.isArray(accountsData) ? accountsData : [])
@@ -235,7 +235,7 @@ export default function Home() {
   return (
     <div className="space-y-6 md:space-y-8 pb-20 md:pb-8 px-3 sm:px-4 md:px-6 pt-4">
       {/* En-tête avec titre et sélecteur de période */}
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         className="space-y-4"
@@ -273,7 +273,7 @@ export default function Home() {
                 </div>
                 <span className="text-sm font-medium text-slate-300 hidden sm:inline">Période :</span>
               </div>
-              
+
               <div className="flex gap-2 overflow-x-auto flex-1 pb-1 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent">
                 <motion.button
                   key="current"
@@ -281,11 +281,10 @@ export default function Home() {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0 }}
                   onClick={() => { setShowCurrent(true); setSelectedPeriod(''); }}
-                  className={`relative flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 ${
-                    showCurrent
-                      ? 'bg-gradient-to-r from-green-600 to-blue-600 text-white shadow-lg shadow-green-500/25'
-                      : 'bg-slate-700/40 hover:bg-slate-700/70 text-slate-300 hover:text-white border border-slate-600/30 hover:border-slate-500/50'
-                  }`}
+                  className={`relative flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 ${showCurrent
+                    ? 'bg-gradient-to-r from-green-600 to-blue-600 text-white shadow-lg shadow-green-500/25'
+                    : 'bg-slate-700/40 hover:bg-slate-700/70 text-slate-300 hover:text-white border border-slate-600/30 hover:border-slate-500/50'
+                    }`}
                 >
                   <span className={`text-sm font-semibold`}>Période actuelle</span>
                 </motion.button>
@@ -296,11 +295,10 @@ export default function Home() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: (idx + 1) * 0.03 }}
                     onClick={() => { setShowCurrent(false); setSelectedPeriod(period.key); }}
-                    className={`relative flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 ${
-                      !showCurrent && selectedPeriod === period.key
-                        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-500/25'
-                        : 'bg-slate-700/40 hover:bg-slate-700/70 text-slate-300 hover:text-white border border-slate-600/30 hover:border-slate-500/50'
-                    }`}
+                    className={`relative flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 ${!showCurrent && selectedPeriod === period.key
+                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-500/25'
+                      : 'bg-slate-700/40 hover:bg-slate-700/70 text-slate-300 hover:text-white border border-slate-600/30 hover:border-slate-500/50'
+                      }`}
                   >
                     <span className={`text-sm font-semibold`}>
                       {period.label}
@@ -309,7 +307,7 @@ export default function Home() {
                 ))}
               </div>
             </div>
-            
+
           </CardContent>
         </Card>
       </motion.div>
@@ -445,7 +443,7 @@ export default function Home() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.8 }}
         >
-          <Card className="border-2 border-slate-700/50 bg-gradient-to-br from-slate-800/95 to-slate-900/95 shadow-xl backdrop-blur-sm">
+          <Card className="border-2 border-slate-700/50 bg-gradient-to-br from-slate-800/95 to-slate-900/95 shadow-xl backdrop-blur-sm" data-tutorial="expense-chart">
             <CardHeader className="border-b border-slate-700/50">
               <CardTitle className="flex items-center gap-2 text-lg font-bold text-white">
                 <Calendar className="w-5 h-5 text-blue-400" />
@@ -474,7 +472,7 @@ export default function Home() {
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip 
+                      <Tooltip
                         formatter={(value: number) => value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
                         contentStyle={{ backgroundColor: '#ffffffff', border: 'none', borderRadius: '8px' }}
                       />
@@ -516,7 +514,7 @@ export default function Home() {
                   {recentTransactions.map((txn) => (
                     <div key={txn.id} className="flex items-center justify-between py-3 px-3 rounded-lg bg-slate-700/30 border border-slate-600/30 hover:bg-slate-700/50 transition-all">
                       <div className="flex items-center gap-3">
-                        <div 
+                        <div
                           className="w-10 h-10 rounded-full flex items-center justify-center text-lg shadow-md"
                           style={{ backgroundColor: txn.category?.color + '30' }}
                         >

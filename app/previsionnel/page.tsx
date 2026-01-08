@@ -186,6 +186,7 @@ export default function PrevisionnelPage() {
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         className="pt-4"
+        data-tutorial="previsionnel-header"
       >
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
@@ -219,6 +220,7 @@ export default function PrevisionnelPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05 }}
+          data-tutorial="savings-card"
         >
           <Card className={`border-2 shadow-xl ${
             potentialSavings >= 0 
@@ -379,6 +381,7 @@ export default function PrevisionnelPage() {
                   onClick={computeAlgorithm}
                   disabled={loading}
                   className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-lg shadow-purple-500/20"
+                  data-tutorial="calculate-recommendations"
                 >
                   {loading ? (
                     <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
@@ -726,6 +729,7 @@ export default function PrevisionnelPage() {
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.3 }}
           className="space-y-4"
+          data-tutorial="credit-tracking-card"
         >
           <CreditTrackingCard />
           
