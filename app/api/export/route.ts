@@ -69,7 +69,7 @@ export async function GET(request: Request) {
         timeStyle: 'short' 
       })
       csvContent += `"EXPORT MONEYFLOW - ${exportDate}"\n`
-      csvContent += `"Période: ${startDate ? new Date(startDate).toLocaleDateString('fr-FR') : 'Début'} - ${endDate ? new Date(endDate).toLocaleDateString('fr-FR') : 'Aujourd\\'hui'}"\n\n`
+      csvContent += `"Période: ${startDate ? new Date(startDate).toLocaleDateString('fr-FR') : 'Début'} - ${endDate ? new Date(endDate).toLocaleDateString('fr-FR') : "Aujourd'hui" }"\n\n`
 
       if (dataType === 'all' || dataType === 'accounts') {
         // Export des comptes avec plus d'infos
