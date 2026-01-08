@@ -185,3 +185,13 @@ body {
     color: hsl(var(--foreground));
   }
 }
+
+/* Tutorial overlay - ensure spotlight is not clipped */
+html.tutorial-active,
+html.tutorial-active body {
+  overflow-x: clip;
+}
+
+.tutorial-spotlight {
+  overflow: visible !important;
+}

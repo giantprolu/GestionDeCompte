@@ -94,6 +94,12 @@ export default function AppWrapper({ children }: Props) {
     if (type === 'viewer') {
       // Visionneur - rediriger vers /partage
       router.push('/partage')
+    } else {
+      // Utilisateur complet - signaler pour déclencher le tutoriel automatiquement
+      // Le composant TutorialAutoStart (dans TutorialWrapper) va le détecter
+      localStorage.setItem('moneyflow_auto_start_tutorial', 'true')
+      // Déclencher un événement personnalisé pour notifier le même onglet
+      window.dispatchEvent(new Event('tutorial-auto-start'))
     }
     // Utilisateur complet - pas de création de comptes automatique
     // Il devra créer ses comptes manuellement dans /comptes

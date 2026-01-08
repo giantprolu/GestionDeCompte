@@ -117,12 +117,12 @@ export default function TransactionsPage() {
         fetch(`/api/expenses?includeUpcoming=true`), // Récupérer toutes les transactions y compris futures
         fetch('/api/accounts'),
       ])
-      
+
       if (!transactionsRes.ok || !accountsRes.ok) {
         setLoading(false)
         return
       }
-      
+
       const transactionsData = await transactionsRes.json()
       const accountsData = await accountsRes.json()
       // Affiche uniquement les transactions à venir (upcoming)
@@ -180,21 +180,21 @@ export default function TransactionsPage() {
   const lastClosureEndDate = allPeriods.length > 0 ? allPeriods[0].end_date : null;
   const filteredTransactions = showCurrent
     ? transactions.filter(txn => {
-        if (txn.archived) return false;
-        // Si showUpcoming est activé, on inclut toutes les transactions à venir (date future)
-        if (showUpcoming && new Date(txn.date) > new Date()) return true;
-        // Si on a une clôture, on prend les transactions après la date de fin de la dernière clôture
-        if (lastClosureEndDate) {
-          // Transaction doit être après la dernière clôture
-          if (txn.date <= lastClosureEndDate) return false;
-          // Si pas showUpcoming, exclure les transactions futures
-          if (!showUpcoming && new Date(txn.date) > new Date()) return false;
-          return true;
-        }
-        // Sinon (pas de clôture), on prend toutes les transactions non archivées jusqu'à aujourd'hui
+      if (txn.archived) return false;
+      // Si showUpcoming est activé, on inclut toutes les transactions à venir (date future)
+      if (showUpcoming && new Date(txn.date) > new Date()) return true;
+      // Si on a une clôture, on prend les transactions après la date de fin de la dernière clôture
+      if (lastClosureEndDate) {
+        // Transaction doit être après la dernière clôture
+        if (txn.date <= lastClosureEndDate) return false;
+        // Si pas showUpcoming, exclure les transactions futures
         if (!showUpcoming && new Date(txn.date) > new Date()) return false;
         return true;
-      })
+      }
+      // Sinon (pas de clôture), on prend toutes les transactions non archivées jusqu'à aujourd'hui
+      if (!showUpcoming && new Date(txn.date) > new Date()) return false;
+      return true;
+    })
     : currentClosure
       ? transactions.filter(txn => txn.date >= currentClosure.start_date && txn.date <= currentClosure.end_date && txn.archived === true)
       : [];
@@ -208,7 +208,7 @@ export default function TransactionsPage() {
     async function fetchClosure() {
       const userId = accounts.find(acc => acc.ownerUserId)?.ownerUserId
       if (!userId) return
-      
+
       // Ne chercher la clôture que pour les mois passés
       if (selectedMonth !== currentMonthCheck) {
         const closure = await getMonthClosure(userId, selectedMonth)
@@ -361,11 +361,10 @@ export default function TransactionsPage() {
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0 }}
           onClick={() => { setShowCurrent(true); setSelectedPeriod('current'); }}
-          className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 ${
-            showCurrent
+          className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 ${showCurrent
               ? 'bg-gradient-to-r from-green-600 to-blue-600 text-white shadow-lg shadow-green-500/25'
               : 'bg-slate-700/40 hover:bg-slate-700/70 text-slate-300 hover:text-white border border-slate-600/30 hover:border-slate-500/50'
-          }`}
+            }`}
         >
           <span className="text-sm font-semibold">Période actuelle</span>
         </motion.button>
@@ -376,27 +375,26 @@ export default function TransactionsPage() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: (idx + 1) * 0.03 }}
             onClick={() => { setShowCurrent(false); setSelectedPeriod(period.key); }}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 ${
-              !showCurrent && selectedPeriod === period.key
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 ${!showCurrent && selectedPeriod === period.key
                 ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-500/25'
                 : 'bg-slate-700/40 hover:bg-slate-700/70 text-slate-300 hover:text-white border border-slate-600/30 hover:border-slate-500/50'
-            }`}
+              }`}
           >
             <span className="text-sm font-semibold">{period.label}</span>
           </motion.button>
         ))}
       </div>
 
-      
+
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <h1 className="text-3xl md:text-4xl font-bold text-white drop-shadow-lg">Transactions</h1>
-        <Button 
-          onClick={() => setShowForm(!showForm)} 
-          className={`w-full md:w-auto font-semibold shadow-lg hover:shadow-xl transition-all duration-200 px-6 py-6 text-base ${
-            showForm 
-              ? 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700' 
+        <Button
+          onClick={() => setShowForm(!showForm)}
+          data-tutorial="add-transaction-button"
+          className={`w-full md:w-auto font-semibold shadow-lg hover:shadow-xl transition-all duration-200 px-6 py-6 text-base ${showForm
+              ? 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700'
               : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700'
-          }`}
+            }`}
         >
           <Plus className="w-5 h-5 mr-2" />
           {showForm ? 'Annuler' : 'Ajouter'}
@@ -443,16 +441,16 @@ export default function TransactionsPage() {
             <CardContent className="pt-6">
               <Tabs value={formType} onValueChange={(v) => setFormType(v as 'ponctuel' | 'recurrent')} className="w-full">
                 <TabsList className="grid w-full grid-cols-2 bg-slate-700/50 border border-slate-600/50 p-1.5 h-auto">
-                  <TabsTrigger 
-                    value="ponctuel" 
+                  <TabsTrigger
+                    value="ponctuel"
                     className="flex items-center gap-1 md:gap-2 data-[state=active]:bg-gradient-to-br data-[state=active]:from-blue-500 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200 text-slate-300 font-semibold py-2 md:py-3 text-xs md:text-sm"
                   >
                     <Plus className="w-3 h-3 md:w-4 md:h-4" />
                     <span className="hidden sm:inline">Transaction Ponctuelle</span>
                     <span className="sm:hidden">Ponctuelle</span>
                   </TabsTrigger>
-                  <TabsTrigger 
-                    value="recurrent" 
+                  <TabsTrigger
+                    value="recurrent"
                     className="flex items-center gap-1 md:gap-2 data-[state=active]:bg-gradient-to-br data-[state=active]:from-purple-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200 text-slate-300 font-semibold py-2 md:py-3 text-xs md:text-sm"
                   >
                     <RefreshCw className="w-3 h-3 md:w-4 md:h-4" />
@@ -559,11 +557,10 @@ export default function TransactionsPage() {
                     variant={showUpcoming ? "default" : "outline"}
                     size="sm"
                     onClick={() => setShowUpcoming(!showUpcoming)}
-                    className={`flex items-center gap-1 px-2 py-1 text-xs sm:text-sm rounded-lg transition-all duration-200 ${
-                      showUpcoming 
-                        ? 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white' 
+                    className={`flex items-center gap-1 px-2 py-1 text-xs sm:text-sm rounded-lg transition-all duration-200 ${showUpcoming
+                        ? 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white'
                         : 'bg-slate-700/50 border-slate-600/50 text-slate-300 hover:bg-slate-700'
-                    }`}
+                      }`}
                   >
                     <RefreshCw className="w-4 h-4" />
                     <span className="hidden xs:inline">{showUpcoming ? 'Masquer futures' : 'Voir futures'}</span>
@@ -572,11 +569,10 @@ export default function TransactionsPage() {
                     variant={showAllMonths ? "default" : "outline"}
                     size="sm"
                     onClick={() => setShowAllMonths(!showAllMonths)}
-                    className={`flex items-center gap-1 px-2 py-1 text-xs sm:text-sm rounded-lg transition-all duration-200 ${
-                      showAllMonths
+                    className={`flex items-center gap-1 px-2 py-1 text-xs sm:text-sm rounded-lg transition-all duration-200 ${showAllMonths
                         ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white'
                         : 'bg-slate-700/50 border-slate-600/50 text-slate-300 hover:bg-slate-700'
-                    }`}
+                      }`}
                   >
                     <Calendar className="w-4 h-4" />
                     <span className="hidden xs:inline">{showAllMonths ? 'Tous mois' : 'Mois sélectionné'}</span>
@@ -596,84 +592,83 @@ export default function TransactionsPage() {
               {finalFilteredTransactions.map((transaction) => {
                 const isFuture = new Date(transaction.date) > new Date()
                 return (
-                <motion.div
-                  key={transaction.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all hover:shadow-lg ${
-                    isFuture 
-                      ? 'bg-gradient-to-br from-blue-900/20 to-blue-800/20 border-blue-500/30 backdrop-blur-sm' 
-                      : transaction.type === 'income' 
-                        ? 'bg-gradient-to-br from-green-900/20 to-green-800/20 border-green-500/30' 
-                        : 'bg-gradient-to-br from-red-900/20 to-red-800/20 border-red-500/30'
-                  }`}
-                >
-                  <div className="flex items-start gap-3 md:gap-4 flex-1 min-w-0">
-                    <div 
-                      className="w-11 h-11 md:w-14 md:h-14 rounded-2xl flex items-center justify-center text-xl md:text-3xl flex-shrink-0 shadow-lg border-2"
-                      style={{ 
-                        backgroundColor: transaction.category?.color + '30',
-                        borderColor: transaction.category?.color + '60'
-                      }}
-                    >
-                      {transaction.category?.icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-base md:text-lg text-white mb-1.5">{transaction.category?.name}</p>
-                      {transaction.isRecurring && (
-                        <div className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-400/30 text-xs font-semibold mb-1.5">
-                          <RefreshCw className="w-3 h-3 flex-shrink-0" />
-                          <span>
-                            {transaction.recurrenceFrequency === 'monthly' && 'Mensuel'}
-                            {transaction.recurrenceFrequency === 'yearly' && 'Annuel'}
-                            {transaction.recurrenceFrequency === 'weekly' && 'Hebdo'}
-                            {transaction.recurrenceDay && ` (le ${transaction.recurrenceDay})`}
+                  <motion.div
+                    key={transaction.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all hover:shadow-lg ${isFuture
+                        ? 'bg-gradient-to-br from-blue-900/20 to-blue-800/20 border-blue-500/30 backdrop-blur-sm'
+                        : transaction.type === 'income'
+                          ? 'bg-gradient-to-br from-green-900/20 to-green-800/20 border-green-500/30'
+                          : 'bg-gradient-to-br from-red-900/20 to-red-800/20 border-red-500/30'
+                      }`}
+                  >
+                    <div className="flex items-start gap-3 md:gap-4 flex-1 min-w-0">
+                      <div
+                        className="w-11 h-11 md:w-14 md:h-14 rounded-2xl flex items-center justify-center text-xl md:text-3xl flex-shrink-0 shadow-lg border-2"
+                        style={{
+                          backgroundColor: transaction.category?.color + '30',
+                          borderColor: transaction.category?.color + '60'
+                        }}
+                      >
+                        {transaction.category?.icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-base md:text-lg text-white mb-1.5">{transaction.category?.name}</p>
+                        {transaction.isRecurring && (
+                          <div className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-400/30 text-xs font-semibold mb-1.5">
+                            <RefreshCw className="w-3 h-3 flex-shrink-0" />
+                            <span>
+                              {transaction.recurrenceFrequency === 'monthly' && 'Mensuel'}
+                              {transaction.recurrenceFrequency === 'yearly' && 'Annuel'}
+                              {transaction.recurrenceFrequency === 'weekly' && 'Hebdo'}
+                              {transaction.recurrenceDay && ` (le ${transaction.recurrenceDay})`}
+                            </span>
+                          </div>
+                        )}
+                        {isFuture && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 border border-blue-400/30 text-xs font-medium mb-1.5 ml-1.5">
+                            Future
                           </span>
-                        </div>
-                      )}
-                      {isFuture && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 border border-blue-400/30 text-xs font-medium mb-1.5 ml-1.5">
-                          Future
-                        </span>
-                      )}
-                      <p className="text-xs md:text-sm text-slate-400 font-medium">
-                        {transaction.account?.name} • {new Date(transaction.date).toLocaleDateString('fr-FR')}
-                      </p>
-                      {transaction.note && (
-                        <p className="text-xs text-slate-500 mt-1 italic">{transaction.note}</p>
-                      )}
+                        )}
+                        <p className="text-xs md:text-sm text-slate-400 font-medium">
+                          {transaction.account?.name} • {new Date(transaction.date).toLocaleDateString('fr-FR')}
+                        </p>
+                        {transaction.note && (
+                          <p className="text-xs text-slate-500 mt-1 italic">{transaction.note}</p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
-                    <span className={`text-base md:text-xl font-bold ${
-                      transaction.type === 'income' ? 'text-green-400' : 'text-red-400'
-                    }`}>
-                      {transaction.type === 'income' ? '+' : '-'}{transaction.amount.toFixed(2)} €
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleEditTransaction(transaction)}
-                      className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/20 h-9 w-9 md:h-10 md:w-10 rounded-lg transition-all"
-                    >
-                      <Pencil className="w-4 h-4 md:w-5 md:h-5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDeleteTransaction(transaction.id)}
-                      className="text-red-400 hover:text-red-300 hover:bg-red-500/20 h-9 w-9 md:h-10 md:w-10 rounded-lg transition-all"
-                    >
-                      <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
-                    </Button>
-                  </div>
-                </motion.div>
-              )})}
+                    <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
+                      <span className={`text-base md:text-xl font-bold ${transaction.type === 'income' ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                        {transaction.type === 'income' ? '+' : '-'}{transaction.amount.toFixed(2)} €
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEditTransaction(transaction)}
+                        className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/20 h-9 w-9 md:h-10 md:w-10 rounded-lg transition-all"
+                      >
+                        <Pencil className="w-4 h-4 md:w-5 md:h-5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteTransaction(transaction.id)}
+                        className="text-red-400 hover:text-red-300 hover:bg-red-500/20 h-9 w-9 md:h-10 md:w-10 rounded-lg transition-all"
+                      >
+                        <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
+                      </Button>
+                    </div>
+                  </motion.div>
+                )
+              })}
             </div>
           )}
         </CardContent>
       </Card>
-          
+
       {/* Modal d'édition */}
       {editingTransaction && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">

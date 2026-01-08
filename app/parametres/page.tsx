@@ -4,16 +4,19 @@ import { useState, useEffect } from 'react'
 import { useUser } from '@clerk/nextjs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Settings, Eye, Wallet, Check, ArrowLeft, Loader2 } from 'lucide-react'
+import { Settings, Eye, Wallet, Check, ArrowLeft, Loader2, HelpCircle } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { useUserSettings } from '@/components/AppWrapper'
 import PushNotificationManager from '@/components/PushNotificationManager'
 import NotificationSettings from '@/components/NotificationSettings'
+import { useTutorial } from '@/lib/tutorial/useTutorial'
+import { onboardingTutorial } from '@/lib/tutorial/onboardingTutorial'
 
 export default function ParametresPage() {
   const { isSignedIn, isLoaded } = useUser()
   const { userType, setUserType } = useUserSettings()
+  const { startTutorial, state: tutorialState } = useTutorial()
   const [selectedType, setSelectedType] = useState<'viewer' | 'user' | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
@@ -248,6 +251,29 @@ export default function ParametresPage() {
 
       {/* Paramètres détaillés des notifications */}
       <NotificationSettings />
+
+      {/* Aide et tutoriel */}
+      <Card className="bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <HelpCircle className="w-5 h-5 text-purple-400" />
+            Aide
+          </CardTitle>
+          <p className="text-sm text-slate-400">
+            Relancez le tutoriel pour redécouvrir les fonctionnalités
+          </p>
+        </CardHeader>
+        <CardContent>
+          <Button
+            onClick={() => startTutorial(onboardingTutorial)}
+            disabled={tutorialState.isActive}
+            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium"
+          >
+            <HelpCircle className="w-4 h-4 mr-2" />
+            Lancer le tutoriel
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   )
 }

@@ -451,7 +451,7 @@ export default function PartagePage() {
 
   return (
     <div className="space-y-6 md:space-y-8 pb-20 md:pb-8 px-3 sm:px-4 md:px-8 lg:px-12 pt-4 max-w-7xl mx-auto">
-      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4" data-tutorial="partage-header">
         <div>
           <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold">Dashboards Partagés</h1>
           <p className="text-muted-foreground mt-1 text-sm md:text-base">

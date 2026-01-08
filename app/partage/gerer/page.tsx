@@ -136,6 +136,7 @@ export default function PartagePage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
+        data-tutorial="share-dashboard-card"
       >
         <Card className="border-2 border-blue-400/30 bg-gradient-to-br from-slate-800 to-slate-900 shadow-xl">
           <CardHeader className="border-b border-slate-700/50">
