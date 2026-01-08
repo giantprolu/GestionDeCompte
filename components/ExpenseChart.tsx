@@ -164,7 +164,7 @@ export default function ExpenseChart() {
   }
 
   return (
-    <Card className="bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700">
+    <Card className="bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700" data-tutorial="expense-chart">
       <CardHeader>
         <CardTitle className="text-lg flex items-center gap-2">
           <BarChart3 className="w-5 h-5 text-purple-400" />

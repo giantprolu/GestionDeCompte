@@ -201,10 +201,11 @@ export default function CategoriesPage() {
       </div>
 
       {/* Bouton d'ajout */}
-      <Card className="bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700">
+      <Card className="bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700" data-tutorial="add-category-card">
         <CardContent className="pt-6">
           <Button
             onClick={() => setShowForm(!showForm)}
+            data-tutorial="add-category-button"
             className={`w-full ${showForm ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
           >
             {showForm ? (

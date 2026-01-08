@@ -5,15 +5,17 @@ import type { TutorialConfig } from './types'
  * 
  * This tutorial guides users through the main features:
  * 1. Welcome message
- * 2. Creating their first account
- * 3. Adding a transaction
- * 4. Categories management
- * 5. Export PDF
- * 6. Viewing analytics
- * 7. Budget planning (Prévisionnel)
- * 8. Credit/Loan tracking
- * 9. Account sharing
- * 10. Completion celebration
+ * 2. Navigation
+ * 3. Creating their first account
+ * 4. Adding a transaction
+ * 5. Access to categories (button focus)
+ * 6. Adding custom categories (button focus)
+ * 7. Export PDF (button focus)
+ * 8. Viewing analytics (component focus)
+ * 9. Budget planning (Prévisionnel)
+ * 10. Credit/Loan tracking
+ * 11. Account sharing
+ * 12. Completion celebration
  */
 export const onboardingTutorial: TutorialConfig = {
     id: 'onboarding',
@@ -64,30 +66,46 @@ export const onboardingTutorial: TutorialConfig = {
             canSkip: true
         },
         {
-            id: 'categories',
+            id: 'categories-button',
             icon: '🏷️',
-            title: 'Catégories personnalisées',
-            description: 'Créez vos propres catégories pour mieux organiser vos transactions. Accédez à cette page depuis le bouton "Catégories" dans les transactions.',
+            title: 'Accédez aux catégories',
+            description: 'Cliquez sur ce bouton pour accéder à la page de gestion des catégories personnalisées.',
+            targetSelector: 'categories-button',
+            route: '/transactions',
+            placement: 'bottom',
+            mobilePlacement: 'bottom',
+            highlightStyle: 'pulse',
+            canSkip: true
+        },
+        {
+            id: 'add-category',
+            icon: '➕',
+            title: 'Créez une catégorie',
+            description: 'Utilisez ce bouton pour créer une nouvelle catégorie. Vous pouvez choisir un nom, un type (dépense/revenu), une icône et une couleur.',
+            targetSelector: 'add-category-button',
             route: '/categories',
-            placement: 'center',
-            mobilePlacement: 'center',
+            placement: 'bottom',
+            mobilePlacement: 'bottom',
+            highlightStyle: 'pulse',
             canSkip: true
         },
         {
             id: 'export-pdf',
             icon: '📄',
             title: 'Exportez en PDF',
-            description: 'Exportez vos transactions au format PDF pour les conserver ou les partager. Utilisez le bouton "Exporter PDF" dans la page transactions.',
+            description: 'Cliquez sur ce bouton pour exporter vos transactions au format PDF. Idéal pour conserver ou partager vos données.',
+            targetSelector: 'export-pdf-button',
             route: '/transactions',
-            placement: 'center',
-            mobilePlacement: 'center',
+            placement: 'bottom',
+            mobilePlacement: 'bottom',
+            highlightStyle: 'pulse',
             canSkip: true
         },
         {
             id: 'view-analytics',
             icon: '📊',
-            title: 'Analysez vos dépenses',
-            description: 'Visualisez la répartition de vos dépenses par catégorie. Vous pouvez choisir différentes périodes pour comparer vos habitudes.',
+            title: 'Visualisation par catégorie',
+            description: 'Ce graphique montre la répartition de vos dépenses ou revenus par catégorie. Utilisez les boutons pour changer de période ou de type de graphique.',
             targetSelector: 'expense-chart',
             route: '/',
             placement: 'top',

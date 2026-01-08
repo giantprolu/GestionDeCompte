@@ -479,6 +479,7 @@ export default function TransactionsPage() {
           <Link href="/categories">
             <Button
               variant="outline"
+              data-tutorial="categories-button"
               className="w-full sm:w-auto bg-slate-700/50 border-slate-600 text-slate-200 hover:bg-slate-700 hover:text-white font-semibold px-4 py-6"
             >
               <Tag className="w-4 h-4 mr-2" />
@@ -488,6 +489,7 @@ export default function TransactionsPage() {
           <Button
             onClick={handleExportPDF}
             variant="outline"
+            data-tutorial="export-pdf-button"
             className="w-full sm:w-auto bg-slate-700/50 border-slate-600 text-slate-200 hover:bg-slate-700 hover:text-white font-semibold px-4 py-6"
           >
             <FileDown className="w-4 h-4 mr-2" />
