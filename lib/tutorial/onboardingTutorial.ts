@@ -7,11 +7,13 @@ import type { TutorialConfig } from './types'
  * 1. Welcome message
  * 2. Creating their first account
  * 3. Adding a transaction
- * 4. Viewing analytics
- * 5. Budget planning (Prévisionnel)
- * 6. Credit/Loan tracking
- * 7. Account sharing
- * 8. Completion celebration
+ * 4. Categories management
+ * 5. Export PDF
+ * 6. Viewing analytics
+ * 7. Budget planning (Prévisionnel)
+ * 8. Credit/Loan tracking
+ * 9. Account sharing
+ * 10. Completion celebration
  */
 export const onboardingTutorial: TutorialConfig = {
     id: 'onboarding',
@@ -62,10 +64,30 @@ export const onboardingTutorial: TutorialConfig = {
             canSkip: true
         },
         {
+            id: 'categories',
+            icon: '🏷️',
+            title: 'Catégories personnalisées',
+            description: 'Créez vos propres catégories pour mieux organiser vos transactions. Accédez à cette page depuis le bouton "Catégories" dans les transactions.',
+            route: '/categories',
+            placement: 'center',
+            mobilePlacement: 'center',
+            canSkip: true
+        },
+        {
+            id: 'export-pdf',
+            icon: '📄',
+            title: 'Exportez en PDF',
+            description: 'Exportez vos transactions au format PDF pour les conserver ou les partager. Utilisez le bouton "Exporter PDF" dans la page transactions.',
+            route: '/transactions',
+            placement: 'center',
+            mobilePlacement: 'center',
+            canSkip: true
+        },
+        {
             id: 'view-analytics',
             icon: '📊',
             title: 'Analysez vos dépenses',
-            description: 'Visualisez la répartition de vos dépenses par catégorie.',
+            description: 'Visualisez la répartition de vos dépenses par catégorie. Vous pouvez choisir différentes périodes pour comparer vos habitudes.',
             targetSelector: 'expense-chart',
             route: '/',
             placement: 'top',
@@ -133,7 +155,7 @@ export const onboardingTutorial: TutorialConfig = {
             id: 'complete',
             icon: '🎉',
             title: 'Vous êtes prêt !',
-            description: 'Vous connaissez maintenant toutes les fonctionnalités. Pour relancer ce tutoriel, rendez-vous dans Paramètres > Aide. Bonne gestion !',
+            description: 'Vous connaissez maintenant toutes les fonctionnalités. Pour relancer ce tutoriel, utilisez le bouton "?" en bas à droite de l\'écran ou rendez-vous dans Paramètres > Aide. Bonne gestion !',
             placement: 'center',
             nextButtonText: 'Terminer',
             canSkip: false

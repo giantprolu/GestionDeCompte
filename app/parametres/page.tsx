@@ -234,6 +234,29 @@ export default function ParametresPage() {
         </CardContent>
       </Card>
 
+      {/* Aide et tutoriel - En haut */}
+      <Card className="bg-gradient-to-br from-purple-900/30 to-slate-900 border-purple-700/50">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <HelpCircle className="w-5 h-5 text-purple-400" />
+            Aide
+          </CardTitle>
+          <p className="text-sm text-slate-400">
+            Relancez le tutoriel pour redécouvrir les fonctionnalités
+          </p>
+        </CardHeader>
+        <CardContent>
+          <Button
+            onClick={() => startTutorial(onboardingTutorial)}
+            disabled={tutorialState.isActive}
+            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium"
+          >
+            <HelpCircle className="w-4 h-4 mr-2" />
+            Lancer le tutoriel
+          </Button>
+        </CardContent>
+      </Card>
+
       {/* Activation des notifications */}
       <Card className="bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700">
         <CardHeader>
@@ -263,29 +286,6 @@ export default function ParametresPage() {
 
       {/* Export des données */}
       <ExportData />
-
-      {/* Aide et tutoriel */}
-      <Card className="bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <HelpCircle className="w-5 h-5 text-purple-400" />
-            Aide
-          </CardTitle>
-          <p className="text-sm text-slate-400">
-            Relancez le tutoriel pour redécouvrir les fonctionnalités
-          </p>
-        </CardHeader>
-        <CardContent>
-          <Button
-            onClick={() => startTutorial(onboardingTutorial)}
-            disabled={tutorialState.isActive}
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium"
-          >
-            <HelpCircle className="w-4 h-4 mr-2" />
-            Lancer le tutoriel
-          </Button>
-        </CardContent>
-      </Card>
     </div>
   )
 }
