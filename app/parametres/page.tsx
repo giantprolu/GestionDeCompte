@@ -10,6 +10,9 @@ import Link from 'next/link'
 import { useUserSettings } from '@/components/AppWrapper'
 import PushNotificationManager from '@/components/PushNotificationManager'
 import NotificationSettings from '@/components/NotificationSettings'
+import CategoryManager from '@/components/CategoryManager'
+import ExportData from '@/components/ExportData'
+import ExpenseChart from '@/components/ExpenseChart'
 import { useTutorial } from '@/lib/tutorial/useTutorial'
 import { onboardingTutorial } from '@/lib/tutorial/onboardingTutorial'
 
@@ -251,6 +254,15 @@ export default function ParametresPage() {
 
       {/* Paramètres détaillés des notifications */}
       <NotificationSettings />
+
+      {/* Catégories personnalisées */}
+      <CategoryManager />
+
+      {/* Visualisation des dépenses */}
+      <ExpenseChart />
+
+      {/* Export des données */}
+      <ExportData />
 
       {/* Aide et tutoriel */}
       <Card className="bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700">

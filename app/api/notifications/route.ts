@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
       low_balance: true,
       low_balance_threshold: 100,
       upcoming_recurring: true,
+      upcoming_recurring_days: 3,
       monthly_summary: true,
     }, {
       onConflict: 'user_id'
@@ -81,6 +82,7 @@ export async function GET() {
       low_balance: true,
       low_balance_threshold: 100,
       upcoming_recurring: true,
+      upcoming_recurring_days: 3,
       monthly_summary: true,
     }
 

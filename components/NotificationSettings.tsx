@@ -21,6 +21,7 @@ interface NotificationPreferences {
   low_balance: boolean
   low_balance_threshold: number
   upcoming_recurring: boolean
+  upcoming_recurring_days: number
   monthly_summary: boolean
 }
 
@@ -29,6 +30,7 @@ const defaultPreferences: NotificationPreferences = {
   low_balance: true,
   low_balance_threshold: 100,
   upcoming_recurring: true,
+  upcoming_recurring_days: 3,
   monthly_summary: true,
 }
 
@@ -48,6 +50,7 @@ export default function NotificationSettings() {
           low_balance: data.low_balance ?? true,
           low_balance_threshold: data.low_balance_threshold ?? 100,
           upcoming_recurring: data.upcoming_recurring ?? true,
+          upcoming_recurring_days: data.upcoming_recurring_days ?? 3,
           monthly_summary: data.monthly_summary ?? true,
         })
       }
@@ -124,10 +127,11 @@ export default function NotificationSettings() {
       key: 'upcoming_recurring' as const,
       icon: Calendar,
       title: 'Prélèvements à venir',
-      description: 'Rappel 3 jours avant un prélèvement récurrent',
+      description: `Rappel ${preferences.upcoming_recurring_days} jour(s) avant un prélèvement récurrent`,
       color: 'text-blue-500',
       bgColor: 'bg-blue-500/20',
       activeColor: 'border-blue-500',
+      hasReminderDays: true,
     },
     {
       key: 'monthly_summary' as const,
@@ -217,6 +221,29 @@ export default function NotificationSettings() {
                             step={10}
                           />
                           <span className="text-slate-400 text-sm">€</span>
+                        </div>
+                      )}
+
+                      {/* Champ pour les jours de rappel */}
+                      {option.hasReminderDays && isActive && (
+                        <div className="mt-3 flex items-center gap-2 relative z-10" onClick={e => e.stopPropagation()}>
+                          <Label htmlFor="reminder-days" className="text-slate-300 text-sm whitespace-nowrap">
+                            Rappel :
+                          </Label>
+                          <Input
+                            id="reminder-days"
+                            type="number"
+                            value={preferences.upcoming_recurring_days}
+                            onChange={(e) => setPreferences(prev => ({
+                              ...prev,
+                              upcoming_recurring_days: parseInt(e.target.value) || 1
+                            }))}
+                            className="w-20 h-9 bg-slate-900 border-slate-600 text-white"
+                            min={1}
+                            max={30}
+                            step={1}
+                          />
+                          <span className="text-slate-400 text-sm">jour(s) avant</span>
                         </div>
                       )}
                     </div>
