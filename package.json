@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:dev": "node ./scripts/run-tests-dev.js"
+    "test:dev": "node ./scripts/run-tests-dev.js",
+    "migrate:clerk": "npx ts-node scripts/migrate-clerk-users.ts"
   },
   "dependencies": {
     "@clerk/localizations": "^3.28.1",
@@ -45,6 +46,7 @@
     "@types/react-dom": "^19",
     "@types/web-push": "^3.6.4",
     "baseline-browser-mapping": "^2.9.2",
+    "dotenv": "^17.2.3",
     "eslint": "^9",
     "eslint-config-next": "16.0.3",
     "jsdom": "^27.2.0",
