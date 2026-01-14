@@ -46,10 +46,10 @@ export function TutorialControls({ step }: TutorialControlsProps) {
     const canSkip = step.canSkip !== false // Default to true
 
     return (
-        <div className="space-y-2 sm:space-y-4">
-            {/* Progress dots */}
+        <div className="space-y-2 sm:space-y-3">
+            {/* Progress dots - more compact on mobile */}
             {totalSteps > 1 && (
-                <div className="flex items-center justify-center gap-1 sm:gap-1.5 flex-wrap">
+                <div className="flex items-center justify-center tutorial-progress-dots flex-wrap py-1">
                     {Array.from({ length: totalSteps }).map((_, index) => (
                         <motion.div
                             key={index}
@@ -59,26 +59,26 @@ export function TutorialControls({ step }: TutorialControlsProps) {
                                 opacity: index === currentIndex ? 1 : 0.4
                             }}
                             className={`rounded-full transition-colors ${index === currentIndex
-                                    ? 'w-4 sm:w-6 h-1.5 sm:h-2 bg-gradient-to-r from-emerald-500 to-blue-500'
+                                    ? 'w-3 sm:w-4 md:w-6 h-1 sm:h-1.5 md:h-2 bg-gradient-to-r from-emerald-500 to-blue-500'
                                     : index < currentIndex
-                                        ? 'w-1.5 sm:w-2 h-1.5 sm:h-2 bg-emerald-500'
-                                        : 'w-1.5 sm:w-2 h-1.5 sm:h-2 bg-slate-500'
+                                        ? 'w-1 sm:w-1.5 md:w-2 h-1 sm:h-1.5 md:h-2 bg-emerald-500'
+                                        : 'w-1 sm:w-1.5 md:w-2 h-1 sm:h-1.5 md:h-2 bg-slate-500'
                                 }`}
                         />
                     ))}
                 </div>
             )}
 
-            {/* Navigation buttons */}
-            <div className="flex items-center justify-between gap-2 sm:gap-3">
+            {/* Navigation buttons - touch-friendly */}
+            <div className="flex items-center justify-between gap-2">
                 {/* Skip button */}
                 {canSkip && !isLastStep && (
                     <button
                         onClick={skip}
-                        className="text-xs sm:text-sm text-slate-400 hover:text-slate-200 transition-colors flex items-center gap-0.5 sm:gap-1"
+                        className="tutorial-btn text-xs text-slate-400 hover:text-slate-200 active:text-slate-100 transition-colors flex items-center gap-0.5 px-2 py-1.5 rounded-lg active:bg-slate-700/30"
                     >
-                        <X className="w-3 h-3 sm:w-4 sm:h-4" />
-                        <span>Passer</span>
+                        <X className="w-3 h-3" />
+                        <span className="hidden xs:inline">Passer</span>
                     </button>
                 )}
 
@@ -86,18 +86,17 @@ export function TutorialControls({ step }: TutorialControlsProps) {
                 {(!canSkip || isLastStep) && <div />}
 
                 {/* Previous/Next buttons */}
-                <div className="flex items-center gap-1.5 sm:gap-2">
+                <div className="flex items-center gap-1.5">
                     {/* Previous button */}
                     {!isFirstStep && (
                         <Button
                             variant="ghost"
                             size="sm"
                             onClick={prevStep}
-                            className="text-slate-300 hover:text-white hover:bg-slate-700/50 px-2 sm:px-3 h-8 sm:h-9 text-xs sm:text-sm"
+                            className="tutorial-btn text-slate-300 hover:text-white hover:bg-slate-700/50 active:bg-slate-600/50 px-2 sm:px-3 h-8 text-xs"
                         >
-                            <ChevronLeft className="w-3 h-3 sm:w-4 sm:h-4 mr-0.5 sm:mr-1" />
-                            <span className="hidden xs:inline">{step.prevButtonText || 'Précédent'}</span>
-                            <span className="xs:hidden">Préc.</span>
+                            <ChevronLeft className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline ml-0.5">{step.prevButtonText || 'Préc.'}</span>
                         </Button>
                     )}
 
@@ -105,21 +104,18 @@ export function TutorialControls({ step }: TutorialControlsProps) {
                     <Button
                         onClick={nextStep}
                         size="sm"
-                        className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-medium shadow-lg shadow-emerald-500/20 px-3 sm:px-4 h-8 sm:h-9 text-xs sm:text-sm"
+                        className="tutorial-btn bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 active:from-emerald-700 active:to-emerald-800 text-white font-medium shadow-lg shadow-emerald-500/20 px-3 sm:px-4 h-8 text-xs sm:text-sm"
                     >
-                        {isLastStep
-                            ? (step.nextButtonText || 'Terminer')
-                            : (step.nextButtonText || 'Suivant')
-                        }
-                        {!isLastStep && <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4 ml-0.5 sm:ml-1" />}
+                        <span>{isLastStep ? (step.nextButtonText || 'Terminer') : (step.nextButtonText || 'Suivant')}</span>
+                        {!isLastStep && <ChevronRight className="w-3.5 h-3.5 ml-0.5" />}
                     </Button>
                 </div>
             </div>
 
-            {/* Step counter */}
+            {/* Step counter - smaller on mobile */}
             <div className="text-center">
-                <span className="text-[10px] sm:text-xs text-slate-500">
-                    Étape {currentIndex + 1} sur {totalSteps}
+                <span className="text-[9px] sm:text-[10px] md:text-xs text-slate-500">
+                    {currentIndex + 1}/{totalSteps}
                 </span>
             </div>
             
@@ -129,16 +125,16 @@ export function TutorialControls({ step }: TutorialControlsProps) {
                     initial={{ opacity: 0, y: 5 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.5 }}
-                    className="flex items-center justify-center gap-2 pt-1 pb-1"
+                    className="flex items-center justify-center gap-1.5 pb-0.5"
                 >
                     <motion.div
-                        animate={{ x: [0, -8, 0] }}
-                        transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                        animate={{ x: [0, -6, 0] }}
+                        transition={{ duration: 1.5, repeat: 3, ease: "easeInOut" }}
                     >
-                        <Hand className="w-3 h-3 text-slate-500" />
+                        <Hand className="w-2.5 h-2.5 text-slate-500" />
                     </motion.div>
-                    <span className="text-[10px] text-slate-500">
-                        Glissez pour naviguer
+                    <span className="text-[9px] text-slate-500">
+                        Glissez ← →
                     </span>
                 </motion.div>
             )}

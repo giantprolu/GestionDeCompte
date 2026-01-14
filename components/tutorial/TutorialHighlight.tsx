@@ -15,9 +15,17 @@ function isMobileViewport(): boolean {
     return window.innerWidth < 768
 }
 
+// Check if in standalone PWA mode
+function isStandalonePWA(): boolean {
+    if (typeof window === 'undefined') return false
+    return window.matchMedia('(display-mode: standalone)').matches ||
+           (window.navigator as Navigator & { standalone?: boolean }).standalone === true
+}
+
 /**
  * Spotlight/highlight effect that isolates the target element
  * Uses a CSS box-shadow technique to create the "cutout" effect
+ * Optimized for mobile PWA with reduced animations
  */
 export function TutorialHighlight({
     targetRect,
@@ -27,36 +35,42 @@ export function TutorialHighlight({
     // If no target rect, it's a centered modal step
     const isCenterMode = !targetRect
     const isMobile = isMobileViewport()
+    const isPWA = isStandalonePWA()
 
     // Padding around the highlighted element - smaller on mobile
     const padding = isMobile ? 4 : 8
 
-    // Calculate spotlight dimensions
+    // Calculate spotlight dimensions with bounds checking
     const spotlightStyle = targetRect ? {
-        left: targetRect.left - padding,
-        top: targetRect.top - padding,
-        width: targetRect.width + padding * 2,
-        height: targetRect.height + padding * 2
+        left: Math.max(0, targetRect.left - padding),
+        top: Math.max(0, targetRect.top - padding),
+        width: Math.min(targetRect.width + padding * 2, window.innerWidth),
+        height: Math.min(targetRect.height + padding * 2, window.innerHeight)
     } : null
+
+    // Simpler glow on mobile for performance
+    const glowEffect = isMobile 
+        ? '0 0 20px 3px rgba(16, 185, 129, 0.3)'
+        : '0 0 30px 5px rgba(16, 185, 129, 0.4), 0 0 60px 10px rgba(16, 185, 129, 0.2)'
 
     return (
         <>
-            {/* Light overlay - no blur */}
+            {/* Dark overlay - touch passthrough disabled */}
             <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.3 }}
-                className="fixed inset-0 z-[9998]"
+                transition={{ duration: isMobile ? 0.2 : 0.3 }}
+                className="fixed inset-0 z-[9998] touch-none"
                 style={{
-                    backgroundColor: 'rgba(0, 0, 0, 0.4)'
+                    backgroundColor: isMobile ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.4)'
                 }}
             />
 
             {/* Spotlight cutout */}
             {spotlightStyle && !isLoading && (
                 <motion.div
-                    initial={{ opacity: 0, scale: 1.1 }}
+                    initial={{ opacity: 0, scale: isMobile ? 1.05 : 1.1 }}
                     animate={{
                         opacity: 1,
                         scale: 1,
@@ -65,26 +79,27 @@ export function TutorialHighlight({
                     exit={{ opacity: 0, scale: 0.95 }}
                     transition={{
                         type: 'spring',
-                        damping: 25,
-                        stiffness: 300
+                        damping: isMobile ? 30 : 25,
+                        stiffness: isMobile ? 400 : 300
                     }}
                     className="fixed z-[9999] pointer-events-none tutorial-spotlight"
                     style={{
-                        borderRadius: '12px',
+                        borderRadius: isMobile ? '8px' : '12px',
                         overflow: 'visible',
-                        // Create spotlight with massive box-shadow that covers the overlay
+                        // Create spotlight with box-shadow that covers the overlay
                         boxShadow: `
-              0 0 0 calc(100vw + 100vh) rgba(0, 0, 0, 0.4),
-              ${highlightStyle === 'glow' ? '0 0 30px 5px rgba(16, 185, 129, 0.4)' : ''},
-              ${highlightStyle === 'glow' ? '0 0 60px 10px rgba(16, 185, 129, 0.2)' : ''}
-            `,
+                            0 0 0 calc(100vw + 100vh) ${isMobile ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.4)'},
+                            ${highlightStyle === 'glow' ? glowEffect : ''}
+                        `,
                         border: highlightStyle === 'border'
                             ? '2px solid rgba(16, 185, 129, 0.8)'
-                            : '2px solid rgba(255, 255, 255, 0.2)'
+                            : isMobile 
+                                ? '1.5px solid rgba(255, 255, 255, 0.25)' 
+                                : '2px solid rgba(255, 255, 255, 0.2)'
                     }}
                 >
-                    {/* Pulse animation overlay */}
-                    {highlightStyle === 'pulse' && (
+                    {/* Pulse animation overlay - disabled on mobile for performance */}
+                    {highlightStyle === 'pulse' && !isMobile && (
                         <motion.div
                             className="absolute inset-0 rounded-xl"
                             animate={{
@@ -103,7 +118,7 @@ export function TutorialHighlight({
                 </motion.div>
             )}
 
-            {/* Loading state */}
+            {/* Loading state - more compact on mobile */}
             {isLoading && (
                 <motion.div
                     initial={{ opacity: 0 }}
@@ -111,9 +126,9 @@ export function TutorialHighlight({
                     exit={{ opacity: 0 }}
                     className="fixed inset-0 z-[9999] flex items-center justify-center"
                 >
-                    <div className="flex flex-col items-center gap-3 text-white">
-                        <Loader2 className="w-8 h-8 animate-spin text-emerald-400" />
-                        <p className="text-sm text-slate-300">Chargement...</p>
+                    <div className="flex flex-col items-center gap-2 text-white">
+                        <Loader2 className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} animate-spin text-emerald-400`} />
+                        <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-slate-300`}>Chargement...</p>
                     </div>
                 </motion.div>
             )}

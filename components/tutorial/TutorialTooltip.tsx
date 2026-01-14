@@ -29,9 +29,10 @@ interface ArrowPosition {
 }
 
 const TOOLTIP_MARGIN = 12
-const TOOLTIP_MARGIN_MOBILE = 12
+const TOOLTIP_MARGIN_MOBILE = 8
 const TOOLTIP_WIDTH = 340
-const ARROW_SIZE = 10
+const TOOLTIP_WIDTH_MOBILE = 'calc(100vw - 16px)'
+const ARROW_SIZE = 8
 
 // Check if viewport is mobile
 function isMobileViewport(): boolean {
@@ -51,14 +52,15 @@ function calculatePosition(
     
     // Center mode - no target (welcome screen, etc.)
     if (!targetRect) {
-        // On mobile, use full width with margins
+        // On mobile, use full width with margins and account for safe areas
         if (isMobile) {
             return {
                 position: {
                     top: '50%',
                     left: margin,
                     right: margin,
-                    transform: 'translateY(-50%)'
+                    transform: 'translateY(-50%)',
+                    maxHeight: '70vh'
                 },
                 arrow: { borderColor: 'transparent' },
                 actualPlacement: 'center'
@@ -93,11 +95,14 @@ function calculatePosition(
         const arrowLeftPercent = Math.max(10, Math.min(90, (targetCenterX / viewport.width) * 100))
         
         if (goBelow) {
+            // Calculate max height to avoid overflow at bottom
+            const maxAvailableHeight = viewport.height - targetRect.bottom - margin - 20 // 20px buffer for safe area
             return {
                 position: {
                     top: targetRect.bottom + margin,
                     left: margin,
-                    right: margin
+                    right: margin,
+                    maxHeight: Math.min(maxAvailableHeight, viewport.height * 0.6)
                 },
                 arrow: {
                     top: -ARROW_SIZE,
@@ -108,11 +113,14 @@ function calculatePosition(
                 actualPlacement: 'bottom'
             }
         } else {
+            // Calculate max height to avoid overflow at top
+            const maxAvailableHeight = targetRect.top - margin - 20 // 20px buffer for safe area
             return {
                 position: {
                     bottom: viewport.height - targetRect.top + margin,
                     left: margin,
-                    right: margin
+                    right: margin,
+                    maxHeight: Math.min(maxAvailableHeight, viewport.height * 0.6)
                 },
                 arrow: {
                     bottom: -ARROW_SIZE,
@@ -310,49 +318,51 @@ export function TutorialTooltip({ step, targetRect }: TutorialTooltipProps) {
                 stiffness: 350,
                 delay: 0.1
             }}
-            className="fixed z-[10000] pointer-events-auto touch-pan-y"
+            className={`fixed z-[10000] pointer-events-auto tutorial-no-zoom ${isMobile ? 'tutorial-tooltip-mobile' : ''}`}
             style={{
                 ...position,
                 width: useAutoWidth ? 'auto' : TOOLTIP_WIDTH,
-                maxWidth: useAutoWidth ? undefined : `calc(100vw - 24px)`
+                maxWidth: useAutoWidth ? undefined : `calc(100vw - 24px)`,
+                touchAction: 'pan-y pinch-zoom'
             }}
             onTouchStart={isMobile ? handleTouchStart : undefined}
             onTouchEnd={isMobile ? handleTouchEnd : undefined}
         >
             {/* Main tooltip container */}
             <div
-                className="relative rounded-xl overflow-hidden"
+                className="relative rounded-xl overflow-hidden max-h-full"
                 style={{
-                    background: 'rgba(30, 41, 59, 0.95)',
-                    backdropFilter: 'blur(12px)',
+                    background: 'rgba(30, 41, 59, 0.98)',
+                    backdropFilter: 'blur(16px)',
+                    WebkitBackdropFilter: 'blur(16px)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
                     boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(16, 185, 129, 0.1)'
                 }}
             >
                 {/* Gradient accent line at top */}
                 <div
-                    className="h-1 w-full"
+                    className="h-1 w-full flex-shrink-0"
                     style={{
                         background: 'linear-gradient(90deg, #10b981 0%, #3b82f6 100%)'
                     }}
                 />
 
-                {/* Content */}
-                <div className="p-4 sm:p-5">
+                {/* Content - scrollable on mobile if needed */}
+                <div className="tutorial-content p-3 sm:p-4 md:p-5 overflow-y-auto" style={{ maxHeight: isMobile ? 'calc(100% - 4px)' : undefined }}>
                     {/* Icon and Title */}
                     <div className="flex items-start gap-2 sm:gap-3 mb-2 sm:mb-3">
                         {step.icon && (
-                            <span className="text-xl sm:text-2xl flex-shrink-0">{step.icon}</span>
+                            <span className="text-lg sm:text-xl md:text-2xl flex-shrink-0">{step.icon}</span>
                         )}
-                        <div>
-                            <h3 className="text-base sm:text-lg font-semibold text-white leading-tight">
+                        <div className="min-w-0 flex-1">
+                            <h3 className="text-sm sm:text-base md:text-lg font-semibold text-white leading-tight">
                                 {step.title}
                             </h3>
                         </div>
                     </div>
 
                     {/* Description */}
-                    <p className="text-slate-300 text-xs sm:text-sm leading-relaxed mb-4 sm:mb-5">
+                    <p className="text-slate-300 text-xs sm:text-sm leading-relaxed mb-3 sm:mb-4 md:mb-5">
                         {step.description}
                     </p>
 
@@ -361,13 +371,13 @@ export function TutorialTooltip({ step, targetRect }: TutorialTooltipProps) {
                 </div>
             </div>
 
-            {/* Arrow */}
+            {/* Arrow - smaller on mobile */}
             {actualPlacement !== 'center' && (
                 <div
                     className="absolute w-0 h-0"
                     style={{
                         ...arrow,
-                        borderWidth: ARROW_SIZE,
+                        borderWidth: isMobile ? ARROW_SIZE - 2 : ARROW_SIZE,
                         borderStyle: 'solid'
                     }}
                 />
