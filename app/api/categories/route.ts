@@ -122,3 +122,63 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'Erreur lors de la suppression de la catégorie' }, { status: 500 })
   }
 }
+
+export async function PATCH(request: Request) {
+  try {
+    const { userId } = await auth()
+    if (!userId) {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const categoryId = searchParams.get('id')
+
+    if (!categoryId) {
+      return NextResponse.json({ error: 'ID de la catégorie requis' }, { status: 400 })
+    }
+
+    const body = await request.json()
+    const { name, icon, color } = body
+
+    // Vérifier que la catégorie est personnalisée et appartient à l'utilisateur
+    const { data: category, error: fetchError } = await supabase
+      .from('categories')
+      .select('id, is_custom, user_id')
+      .eq('id', categoryId)
+      .single()
+
+    if (fetchError || !category) {
+      return NextResponse.json({ error: 'Catégorie non trouvée' }, { status: 404 })
+    }
+
+    if (!category.is_custom) {
+      return NextResponse.json({ error: 'Impossible de modifier une catégorie par défaut' }, { status: 403 })
+    }
+
+    if (category.user_id !== userId) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
+    }
+
+    const updateData: Record<string, string> = {}
+    if (name) updateData.name = name
+    if (icon) updateData.icon = icon
+    if (color) updateData.color = color
+
+    const { data: updatedCategory, error } = await supabase
+      .from('categories')
+      .update(updateData)
+      .eq('id', categoryId)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Update error:', error)
+      throw error
+    }
+
+    return NextResponse.json(updatedCategory)
+  } catch (error) {
+    console.error('Error:', error)
+    return NextResponse.json({ error: 'Erreur lors de la modification de la catégorie' }, { status: 500 })
+  }
+}

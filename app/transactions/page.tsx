@@ -5,7 +5,7 @@ import { useUser } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, Filter, Trash2, TrendingUp, TrendingDown, RefreshCw, Pencil, X, Clock } from 'lucide-react'
+import { Plus, Filter, Trash2, TrendingUp, TrendingDown, RefreshCw, Pencil, X, Clock, Tag, FileDown } from 'lucide-react'
 import { useSelectedMonth, getCurrentMonth } from '@/lib/useSelectedMonth'
 import { getMonthClosure } from '@/lib/utils'
 import { motion } from 'framer-motion'
@@ -15,6 +15,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Calendar, Wallet } from "lucide-react";
 import { useUserSettings } from '@/components/AppWrapper'
 import { supabase } from '@/lib/db'
+import Link from 'next/link'
 
 interface Account {
   id: string
@@ -284,6 +285,92 @@ export default function TransactionsPage() {
     }
   }
 
+  // Export PDF des transactions
+  const handleExportPDF = async () => {
+    // Générer le contenu HTML pour le PDF
+    const periodLabel = showCurrent ? 'Période actuelle' : (allPeriods.find(p => p.key === selectedPeriod)?.label || 'Période sélectionnée')
+    
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Transactions - ${periodLabel}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+          h1 { color: #1e293b; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; }
+          .summary { display: flex; gap: 20px; margin: 20px 0; }
+          .summary-card { padding: 15px; border-radius: 8px; flex: 1; }
+          .income { background: #dcfce7; color: #166534; }
+          .expense { background: #fee2e2; color: #991b1b; }
+          .balance { background: #dbeafe; color: #1e40af; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+          th { background: #f1f5f9; font-weight: 600; }
+          .amount-income { color: #16a34a; font-weight: 600; }
+          .amount-expense { color: #dc2626; font-weight: 600; }
+          .footer { margin-top: 30px; text-align: center; color: #64748b; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <h1>📊 Transactions - ${periodLabel}</h1>
+        <div class="summary">
+          <div class="summary-card income">
+            <strong>Revenus</strong><br>
+            +${totalIncome.toFixed(2)} €
+          </div>
+          <div class="summary-card expense">
+            <strong>Dépenses</strong><br>
+            -${totalExpense.toFixed(2)} €
+          </div>
+          <div class="summary-card balance">
+            <strong>Solde</strong><br>
+            ${balance >= 0 ? '+' : ''}${balance.toFixed(2)} €
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Catégorie</th>
+              <th>Compte</th>
+              <th>Note</th>
+              <th>Montant</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${finalFilteredTransactions.map(t => `
+              <tr>
+                <td>${new Date(t.date).toLocaleDateString('fr-FR')}</td>
+                <td>${t.category?.icon || ''} ${t.category?.name || 'N/A'}</td>
+                <td>${t.account?.name || 'N/A'}</td>
+                <td>${t.note || '-'}</td>
+                <td class="amount-${t.type}">${t.type === 'income' ? '+' : '-'}${t.amount.toFixed(2)} €</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div class="footer">
+          Exporté depuis MoneyFlow le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}
+        </div>
+      </body>
+      </html>
+    `
+
+    // Créer une nouvelle fenêtre pour l'impression
+    const printWindow = window.open('', '_blank')
+    if (printWindow) {
+      printWindow.document.write(htmlContent)
+      printWindow.document.close()
+      printWindow.focus()
+      setTimeout(() => {
+        printWindow.print()
+      }, 250)
+    } else {
+      alert('Veuillez autoriser les popups pour exporter en PDF')
+    }
+  }
+
   // Ouvrir le modal d'édition
   const handleEditTransaction = (transaction: Transaction) => {
     setEditingTransaction(transaction)
@@ -388,17 +475,38 @@ export default function TransactionsPage() {
 
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <h1 className="text-3xl md:text-4xl font-bold text-white drop-shadow-lg">Transactions</h1>
-        <Button
-          onClick={() => setShowForm(!showForm)}
-          data-tutorial="add-transaction-button"
-          className={`w-full md:w-auto font-semibold shadow-lg hover:shadow-xl transition-all duration-200 px-6 py-6 text-base ${showForm
-              ? 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700'
-              : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700'
-            }`}
-        >
-          <Plus className="w-5 h-5 mr-2" />
-          {showForm ? 'Annuler' : 'Ajouter'}
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Link href="/categories">
+            <Button
+              variant="outline"
+              data-tutorial="categories-button"
+              className="w-full sm:w-auto bg-slate-700/50 border-slate-600 text-slate-200 hover:bg-slate-700 hover:text-white font-semibold px-4 py-6"
+            >
+              <Tag className="w-4 h-4 mr-2" />
+              Catégories
+            </Button>
+          </Link>
+          <Button
+            onClick={handleExportPDF}
+            variant="outline"
+            data-tutorial="export-pdf-button"
+            className="w-full sm:w-auto bg-slate-700/50 border-slate-600 text-slate-200 hover:bg-slate-700 hover:text-white font-semibold px-4 py-6"
+          >
+            <FileDown className="w-4 h-4 mr-2" />
+            Exporter PDF
+          </Button>
+          <Button
+            onClick={() => setShowForm(!showForm)}
+            data-tutorial="add-transaction-button"
+            className={`w-full sm:w-auto font-semibold shadow-lg hover:shadow-xl transition-all duration-200 px-6 py-6 text-base ${showForm
+                ? 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700'
+                : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700'
+              }`}
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            {showForm ? 'Annuler' : 'Ajouter'}
+          </Button>
+        </div>
       </div>
 
       {/* Statistiques */}

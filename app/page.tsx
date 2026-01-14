@@ -14,6 +14,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { useUserSettings } from '@/components/AppWrapper'
 import { supabase } from '@/lib/db'
+import ExpenseChart from '@/components/ExpenseChart'
 
 interface Account {
   id: string
@@ -542,6 +543,15 @@ export default function Home() {
           </Card>
         </motion.div>
       </div>
+
+      {/* Visualisation par catégorie - Composant complet */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 1.0 }}
+      >
+        <ExpenseChart />
+      </motion.div>
     </div>
   )
 }

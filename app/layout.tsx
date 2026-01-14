@@ -9,6 +9,7 @@ import AppWrapper from "@/components/AppWrapper";
 import PWAInstallPrompt from "@/components/PWAInstallPrompt";
 import { TutorialWrapper } from "@/components/tutorial/TutorialWrapper";
 import TutorialAutoStart from "@/components/TutorialAutoStart";
+import TutorialHelpButton from "@/components/TutorialHelpButton";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -70,6 +71,7 @@ export default function RootLayout({
                 <Sidebar>
                   {children}
                 </Sidebar>
+                <TutorialHelpButton />
               </TutorialWrapper>
             </AppWrapper>
           </AuthGuard>
