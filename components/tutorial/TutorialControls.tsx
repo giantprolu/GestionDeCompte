@@ -1,7 +1,8 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, X, Hand } from 'lucide-react'
 import { useTutorial } from '@/lib/tutorial/useTutorial'
 import { Button } from '@/components/ui/button'
 import type { TutorialStep } from '@/lib/tutorial/types'
@@ -10,9 +11,23 @@ interface TutorialControlsProps {
     step: TutorialStep
 }
 
+// Hook to detect mobile viewport
+function useIsMobile(): boolean {
+    const [isMobile, setIsMobile] = useState(false)
+    
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768)
+        checkMobile()
+        window.addEventListener('resize', checkMobile)
+        return () => window.removeEventListener('resize', checkMobile)
+    }, [])
+    
+    return isMobile
+}
+
 /**
  * Navigation controls for tutorial steps
- * Includes previous/next buttons, skip link, and progress indicator
+ * Includes previous/next buttons, skip link, progress indicator and swipe hint for mobile
  */
 export function TutorialControls({ step }: TutorialControlsProps) {
     const {
@@ -22,6 +37,8 @@ export function TutorialControls({ step }: TutorialControlsProps) {
         prevStep,
         skip
     } = useTutorial()
+    
+    const isMobile = useIsMobile()
 
     const currentIndex = state.currentStepIndex
     const isFirstStep = currentIndex === 0
@@ -29,7 +46,7 @@ export function TutorialControls({ step }: TutorialControlsProps) {
     const canSkip = step.canSkip !== false // Default to true
 
     return (
-        <div className="space-y-3 sm:space-y-4">
+        <div className="space-y-2 sm:space-y-4">
             {/* Progress dots */}
             {totalSteps > 1 && (
                 <div className="flex items-center justify-center gap-1 sm:gap-1.5 flex-wrap">
@@ -105,6 +122,26 @@ export function TutorialControls({ step }: TutorialControlsProps) {
                     Étape {currentIndex + 1} sur {totalSteps}
                 </span>
             </div>
+            
+            {/* Mobile swipe hint - only show on first step on mobile */}
+            {isMobile && isFirstStep && (
+                <motion.div 
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5 }}
+                    className="flex items-center justify-center gap-2 pt-1 pb-1"
+                >
+                    <motion.div
+                        animate={{ x: [0, -8, 0] }}
+                        transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                    >
+                        <Hand className="w-3 h-3 text-slate-500" />
+                    </motion.div>
+                    <span className="text-[10px] text-slate-500">
+                        Glissez pour naviguer
+                    </span>
+                </motion.div>
+            )}
         </div>
     )
 }

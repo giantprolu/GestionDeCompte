@@ -1,8 +1,9 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { TutorialControls } from './TutorialControls'
+import { useTutorial } from '@/lib/tutorial/useTutorial'
 import type { TutorialStep, TooltipPlacement } from '@/lib/tutorial/types'
 
 interface TutorialTooltipProps {
@@ -230,14 +231,58 @@ function calculatePosition(
 
 /**
  * Animated tooltip with step content and navigation controls
+ * Supports swipe gestures on mobile for navigation
  */
 export function TutorialTooltip({ step, targetRect }: TutorialTooltipProps) {
+    const { nextStep, prevStep, state, totalSteps } = useTutorial()
     const { position, arrow, actualPlacement } = useMemo(
         () => calculatePosition(targetRect, step.placement),
         [targetRect, step.placement]
     )
 
     const isMobile = isMobileViewport()
+    const isFirstStep = state.currentStepIndex === 0
+    const isLastStep = state.currentStepIndex === totalSteps - 1
+    
+    // Touch gesture handling for swipe navigation
+    const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null)
+    const SWIPE_THRESHOLD = 50
+    
+    const handleTouchStart = useCallback((e: React.TouchEvent) => {
+        const touch = e.touches[0]
+        touchStartRef.current = {
+            x: touch.clientX,
+            y: touch.clientY,
+            time: Date.now()
+        }
+    }, [])
+    
+    const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+        if (!touchStartRef.current) return
+        
+        const touch = e.changedTouches[0]
+        const deltaX = touch.clientX - touchStartRef.current.x
+        const deltaY = touch.clientY - touchStartRef.current.y
+        const elapsed = Date.now() - touchStartRef.current.time
+        
+        // Only handle horizontal swipes, ignore vertical
+        if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > SWIPE_THRESHOLD) {
+            // Quick swipe or long enough distance
+            if (elapsed < 300 || Math.abs(deltaX) > SWIPE_THRESHOLD * 1.5) {
+                if (deltaX < 0 && !isLastStep) {
+                    // Swipe left = next
+                    nextStep()
+                    if (navigator.vibrate) navigator.vibrate(25)
+                } else if (deltaX > 0 && !isFirstStep) {
+                    // Swipe right = previous
+                    prevStep()
+                    if (navigator.vibrate) navigator.vibrate(25)
+                }
+            }
+        }
+        
+        touchStartRef.current = null
+    }, [nextStep, prevStep, isFirstStep, isLastStep])
 
     // Animation variants based on placement
     const getInitialPosition = () => {
@@ -265,12 +310,14 @@ export function TutorialTooltip({ step, targetRect }: TutorialTooltipProps) {
                 stiffness: 350,
                 delay: 0.1
             }}
-            className="fixed z-[10000] pointer-events-auto"
+            className="fixed z-[10000] pointer-events-auto touch-pan-y"
             style={{
                 ...position,
                 width: useAutoWidth ? 'auto' : TOOLTIP_WIDTH,
                 maxWidth: useAutoWidth ? undefined : `calc(100vw - 24px)`
             }}
+            onTouchStart={isMobile ? handleTouchStart : undefined}
+            onTouchEnd={isMobile ? handleTouchEnd : undefined}
         >
             {/* Main tooltip container */}
             <div
