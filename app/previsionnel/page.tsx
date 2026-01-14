@@ -1,11 +1,11 @@
 "use client"
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, useCallback, memo } from 'react'
 import { useUser } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import CreditTrackingCard from '@/components/CreditTrackingCard'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
+import { MoneyInput } from '@/components/ui/money-input'
 import { Button } from '@/components/ui/button'
 import { useSelectedMonth } from '@/lib/useSelectedMonth'
 import { useUserSettings } from '@/components/AppWrapper'
@@ -557,13 +557,9 @@ export default function PrevisionnelPage() {
                                 
                                 <div className="flex items-center gap-2">
                                   <Target className="w-4 h-4 text-slate-400" />
-                                  <Input
-                                    type="number"
+                                  <MoneyInput
                                     value={targets[cat] ?? ''}
-                                    onChange={(e) => {
-                                      const v = e.target.value === '' ? 0 : Number(e.target.value.replace(',', '.'))
-                                      saveTarget(cat, v)
-                                    }}
+                                    onChange={(v) => saveTarget(cat, v)}
                                     placeholder="Objectif"
                                     className="w-24 h-8 text-sm bg-slate-900/50 border-slate-600/50 focus:border-purple-500/50"
                                   />
