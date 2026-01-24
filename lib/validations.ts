@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 export const accountSchema = z.object({
   name: z.string().min(1, 'Le nom est requis'),
-  type: z.enum(['ponctuel', 'obligatoire']),
+  type: z.enum(['ponctuel', 'obligatoire', 'livret']),
   initialBalance: z.number(), // Les soldes négatifs sont maintenant autorisés
 })
 

@@ -4,23 +4,48 @@ import { auth } from '@clerk/nextjs/server'
 
 export async function GET(request: Request) {
   try {
+    const { userId } = await auth()
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type') // 'income' ou 'expense'
 
-    let query = supabase
+    // Récupérer les catégories par défaut (is_custom = false)
+    let defaultQuery = supabase
       .from('categories')
       .select('*')
+      .eq('is_custom', false)
       .order('name', { ascending: true })
 
     if (type) {
-      query = query.eq('type', type)
+      defaultQuery = defaultQuery.eq('type', type)
     }
 
-    const { data: categories, error } = await query
+    const { data: defaultCategories, error: defaultError } = await defaultQuery
+    if (defaultError) throw defaultError
 
-    if (error) throw error
-    
-    return NextResponse.json(categories || [])
+    let userCategories: typeof defaultCategories = []
+
+    // Si l'utilisateur est authentifié, récupérer ses catégories personnalisées
+    if (userId) {
+      let userQuery = supabase
+        .from('categories')
+        .select('*')
+        .eq('is_custom', true)
+        .eq('user_id', userId)
+        .order('name', { ascending: true })
+
+      if (type) {
+        userQuery = userQuery.eq('type', type)
+      }
+
+      const { data: userCategoriesData, error: userError } = await userQuery
+      if (userError) throw userError
+      userCategories = userCategoriesData || []
+    }
+
+    // Combiner les deux listes
+    const allCategories = [...(defaultCategories || []), ...userCategories]
+
+    return NextResponse.json(allCategories)
   } catch (error) {
     console.error('Error:', error)
     return NextResponse.json({ error: 'Erreur lors de la récupération des catégories' }, { status: 500 })

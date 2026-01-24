@@ -8,9 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Wallet, Save, Pencil, X, Share2, Plus, Trash2, CreditCard, PiggyBank, ChevronRight, Calculator } from 'lucide-react'
+import { Wallet, Save, Pencil, X, Share2, Plus, Trash2, CreditCard, PiggyBank, ChevronRight, Calculator, ArrowRightLeft } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useUserSettings } from '@/components/AppWrapper'
+import TransferForm from '@/components/TransferForm'
 
 interface Account {
   id: string
@@ -45,9 +46,12 @@ export default function ComptesPage() {
   // États pour le formulaire d'ajout
   const [showAddForm, setShowAddForm] = useState(false)
   const [newAccountName, setNewAccountName] = useState('')
-  const [newAccountType, setNewAccountType] = useState<'ponctuel' | 'obligatoire'>('ponctuel')
+  const [newAccountType, setNewAccountType] = useState<'ponctuel' | 'obligatoire' | 'livret'>('ponctuel')
   const [newAccountBalance, setNewAccountBalance] = useState('')
   const [isCreating, setIsCreating] = useState(false)
+
+  // État pour le formulaire de virement
+  const [showTransferForm, setShowTransferForm] = useState(false)
 
   useEffect(() => {
     if (isLoaded && isSignedIn) {
@@ -211,9 +215,14 @@ export default function ComptesPage() {
     )
   }
 
-  // Calculer les totaux
+  // Calculer les totaux (exclure les livrets du total)
   const totalBalance = accounts
-    .filter(acc => acc.isOwner !== false)
+    .filter(acc => acc.isOwner !== false && acc.type !== 'livret')
+    .reduce((sum, acc) => sum + getCurrentBalance(acc.id), 0)
+
+  // Calculer le solde des livrets séparément
+  const livretsBalance = accounts
+    .filter(acc => acc.isOwner !== false && acc.type === 'livret')
     .reduce((sum, acc) => sum + getCurrentBalance(acc.id), 0)
 
   return (
@@ -227,33 +236,80 @@ export default function ComptesPage() {
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-white">Mes Comptes</h1>
             <p className="text-slate-400 text-sm">
-              {accounts.length} compte{accounts.length > 1 ? 's' : ''} • Solde total: <span className={`font-semibold ${totalBalance >= 0 ? 'text-green-400' : 'text-red-400'}`}>{totalBalance.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
+              {accounts.length} compte{accounts.length > 1 ? 's' : ''} • Comptes courants: <span className={`font-semibold ${totalBalance >= 0 ? 'text-green-400' : 'text-red-400'}`}>{totalBalance.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
+              {livretsBalance > 0 && (
+                <> • Livrets: <span className="font-semibold text-purple-400">{livretsBalance.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span></>
+              )}
             </p>
           </div>
         </div>
-        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-          <Button
-            onClick={() => setShowAddForm(!showAddForm)}
-            data-tutorial="create-account-button"
-            className={`w-full sm:w-auto font-semibold shadow-lg hover:shadow-xl transition-all duration-200 px-5 py-5 text-base ${showAddForm
-                ? 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700'
-                : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700'
-              }`}
-          >
-            {showAddForm ? (
-              <>
-                <X className="w-5 h-5 mr-2" />
-                Annuler
-              </>
-            ) : (
-              <>
-                <Plus className="w-5 h-5 mr-2" />
-                Nouveau compte
-              </>
-            )}
-          </Button>
-        </motion.div>
+        <div className="flex gap-3">
+          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+            <Button
+              onClick={() => setShowTransferForm(!showTransferForm)}
+              disabled={accounts.length < 2}
+              className={`w-full sm:w-auto font-semibold shadow-lg hover:shadow-xl transition-all duration-200 px-5 py-5 text-base ${showTransferForm
+                  ? 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700'
+                  : 'bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+            >
+              {showTransferForm ? (
+                <>
+                  <X className="w-5 h-5 mr-2" />
+                  Annuler
+                </>
+              ) : (
+                <>
+                  <ArrowRightLeft className="w-5 h-5 mr-2" />
+                  Virement
+                </>
+              )}
+            </Button>
+          </motion.div>
+          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+            <Button
+              onClick={() => setShowAddForm(!showAddForm)}
+              data-tutorial="create-account-button"
+              className={`w-full sm:w-auto font-semibold shadow-lg hover:shadow-xl transition-all duration-200 px-5 py-5 text-base ${showAddForm
+                  ? 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700'
+                  : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700'
+                }`}
+            >
+              {showAddForm ? (
+                <>
+                  <X className="w-5 h-5 mr-2" />
+                  Annuler
+                </>
+              ) : (
+                <>
+                  <Plus className="w-5 h-5 mr-2" />
+                  Nouveau compte
+                </>
+              )}
+            </Button>
+          </motion.div>
+        </div>
       </div>
+
+      {/* Formulaire de virement */}
+      <AnimatePresence>
+        {showTransferForm && (
+          <motion.div
+            initial={{ opacity: 0, height: 0, marginTop: 0 }}
+            animate={{ opacity: 1, height: 'auto', marginTop: 24 }}
+            exit={{ opacity: 0, height: 0, marginTop: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <TransferForm
+              accounts={accounts}
+              onClose={() => setShowTransferForm(false)}
+              onTransferCreated={() => {
+                fetchAccounts()
+              }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Formulaire d'ajout de compte */}
       <AnimatePresence>
@@ -291,7 +347,7 @@ export default function ComptesPage() {
                 {/* Type de compte */}
                 <div className="space-y-3">
                   <Label className="text-slate-200 font-semibold">Type de compte</Label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <motion.button
                       type="button"
                       whileHover={{ scale: 1.02 }}
@@ -356,6 +412,40 @@ export default function ComptesPage() {
                         </div>
                         {newAccountType === 'obligatoire' && (
                           <div className="absolute top-2 right-2 w-3 h-3 rounded-full bg-emerald-400" />
+                        )}
+                      </div>
+                    </motion.button>
+
+                    <motion.button
+                      type="button"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setNewAccountType('livret')}
+                      className={`relative p-5 rounded-2xl border-2 transition-all duration-200 text-left overflow-hidden ${newAccountType === 'livret'
+                          ? 'border-purple-500 bg-gradient-to-br from-purple-500/20 to-purple-600/10 shadow-lg shadow-purple-500/20'
+                          : 'border-slate-600/50 bg-slate-700/30 hover:border-slate-500 hover:bg-slate-700/50'
+                        }`}
+                    >
+                      {newAccountType === 'livret' && (
+                        <motion.div
+                          layoutId="accountTypeIndicator"
+                          className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-transparent"
+                        />
+                      )}
+                      <div className="relative flex items-start gap-4">
+                        <div className={`p-3 rounded-xl ${newAccountType === 'livret' ? 'bg-purple-500/30' : 'bg-slate-600/50'}`}>
+                          <span className="text-2xl">🏦</span>
+                        </div>
+                        <div className="flex-1">
+                          <div className={`font-bold text-lg ${newAccountType === 'livret' ? 'text-purple-300' : 'text-slate-300'}`}>
+                            Livret d'épargne
+                          </div>
+                          <div className={`text-sm mt-1 ${newAccountType === 'livret' ? 'text-purple-300/70' : 'text-slate-400'}`}>
+                            Livret A, LDD, épargne qui ne sert pas au budget...
+                          </div>
+                        </div>
+                        {newAccountType === 'livret' && (
+                          <div className="absolute top-2 right-2 w-3 h-3 rounded-full bg-purple-400" />
                         )}
                       </div>
                     </motion.button>
@@ -452,9 +542,12 @@ export default function ComptesPage() {
               transition={{ delay: index * 0.05 }}
               className="flex-shrink-0 w-80"
             >
-              <Card className={`h-full border bg-gradient-to-br from-slate-800/95 to-slate-900/95 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden ${account.type === 'ponctuel'
-                  ? 'border-blue-500/30 hover:border-blue-500/50'
-                  : 'border-emerald-500/30 hover:border-emerald-500/50'
+              <Card className={`h-full border bg-gradient-to-br from-slate-800/95 to-slate-900/95 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden ${
+                  account.type === 'ponctuel'
+                    ? 'border-blue-500/30 hover:border-blue-500/50'
+                    : account.type === 'obligatoire'
+                    ? 'border-emerald-500/30 hover:border-emerald-500/50'
+                    : 'border-purple-500/30 hover:border-purple-500/50'
                 }`}>
                 <CardContent className="p-4">
                   {editingId === account.id ? (
@@ -465,8 +558,20 @@ export default function ComptesPage() {
                       className="space-y-4"
                     >
                       <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-xl ${account.type === 'ponctuel' ? 'bg-blue-500/20' : 'bg-emerald-500/20'}`}>
-                          <Pencil className={`w-5 h-5 ${account.type === 'ponctuel' ? 'text-blue-400' : 'text-emerald-400'}`} />
+                        <div className={`p-2 rounded-xl ${
+                          account.type === 'ponctuel'
+                            ? 'bg-blue-500/20'
+                            : account.type === 'obligatoire'
+                            ? 'bg-emerald-500/20'
+                            : 'bg-purple-500/20'
+                        }`}>
+                          <Pencil className={`w-5 h-5 ${
+                            account.type === 'ponctuel'
+                              ? 'text-blue-400'
+                              : account.type === 'obligatoire'
+                              ? 'text-emerald-400'
+                              : 'text-purple-400'
+                          }`} />
                         </div>
                         <div>
                           <h3 className="font-semibold text-white">{account.name}</h3>
@@ -515,21 +620,31 @@ export default function ComptesPage() {
                       {/* Header avec nom et badges */}
                       <div className="flex items-start justify-between gap-2 mb-3">
                         <div className="flex items-center gap-3">
-                          <div className={`p-2.5 rounded-xl ${account.type === 'ponctuel'
+                          <div className={`p-2.5 rounded-xl ${
+                            account.type === 'ponctuel'
                               ? 'bg-blue-500/20'
-                              : 'bg-emerald-500/20'
+                              : account.type === 'obligatoire'
+                              ? 'bg-emerald-500/20'
+                              : 'bg-purple-500/20'
                             }`}>
                             {account.type === 'ponctuel' ? (
                               <CreditCard className="w-5 h-5 text-blue-400" />
-                            ) : (
+                            ) : account.type === 'obligatoire' ? (
                               <Wallet className="w-5 h-5 text-emerald-400" />
+                            ) : (
+                              <PiggyBank className="w-5 h-5 text-purple-400" />
                             )}
                           </div>
                           <div>
                             <h3 className="font-bold text-base text-white">{account.name}</h3>
-                            <span className={`text-xs font-medium ${account.type === 'ponctuel' ? 'text-blue-400' : 'text-emerald-400'
+                            <span className={`text-xs font-medium ${
+                              account.type === 'ponctuel'
+                                ? 'text-blue-400'
+                                : account.type === 'obligatoire'
+                                ? 'text-emerald-400'
+                                : 'text-purple-400'
                               }`}>
-                              {account.type === 'ponctuel' ? 'Occasionnel' : 'Obligatoire'}
+                              {account.type === 'ponctuel' ? 'Occasionnel' : account.type === 'obligatoire' ? 'Obligatoire' : 'Livret'}
                             </span>
                           </div>
                         </div>
