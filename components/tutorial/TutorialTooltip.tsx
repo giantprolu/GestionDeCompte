@@ -17,6 +17,7 @@ interface TooltipPosition {
     left?: number | string
     right?: number | string
     transform?: string
+    maxHeight?: number | string
 }
 
 interface ArrowPosition {
