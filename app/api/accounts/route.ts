@@ -52,6 +52,8 @@ export async function POST(request: Request) {
         name: body.name,
         type: body.type,
         initial_balance: body.initialBalance,
+        // Automatically exclude livret accounts from previsionnel calculations
+        exclude_from_previsionnel: body.type === 'livret',
       })
       .select()
       .single()

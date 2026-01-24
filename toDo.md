@@ -1,10 +1,9 @@
-- ✅ ~~il faut gérer que si un user supprime son compte clerk toutes ses données doivent être deleted en base~~
-  - **FAIT** : Webhook configuré dans `/api/webhooks/clerk/route.ts` qui écoute l'événement `user.deleted` et supprime toutes les données associées
-  - N'oublie pas de configurer le webhook dans le dashboard Clerk : URL = `https://gestion-de-compte.trouve-tout-conseil.fr/api/webhooks/clerk`, Event = `user.deleted`
-  - Variable d'environnement requise : `CLERK_WEBHOOK_SECRET`
-
-- ✅ ~~il faut gérer le changement clerk de dev vers prod~~
-  - **FAIT** : Script de migration créé dans `/scripts/migrate-clerk-users.ts`
-  - Documentation complète dans `/docs/CLERK_MIGRATION.md`
-  - Commande : `npm run migrate:clerk`
-  - Le script mappe les utilisateurs par email et met à jour tous les user_id dans Supabase
+- mobile et desktop : 
+  - [ ] ajouter l'option de "livret" dans la selection de type de compte
+  - [ ] Pouvoir faire des virements entre comptes, exemple "livret" et "compte courant"
+  - [ ] ne pas prendre en compte les livrets dans le calcul du budget mensuel, du solde total, etc.
+  - [ ] afficher les livrets dans la liste des comptes
+  - [ ] afficher les livrets dans les graphiques (répartition du patrimoine, évolution du patrimoine, etc.)
+  - [ ] revoir le tutoriel / didacticiel pour expliquer et montrer plus de choses, surtout revoir le responsive
+  - [ ] ne pas partager a tous les utilisateurs les catégories personnalisées (actuellement, si un utilisateur crée une catégorie personnalisée, elle est visible par tous les utilisateurs)
+  

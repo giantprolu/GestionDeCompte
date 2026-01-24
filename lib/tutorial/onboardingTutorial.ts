@@ -8,14 +8,15 @@ import type { TutorialConfig } from './types'
  * 2. Navigation
  * 3. Creating their first account
  * 4. Adding a transaction
- * 5. Access to categories (button focus)
- * 6. Adding custom categories (button focus)
- * 7. Export PDF (button focus)
- * 8. Viewing analytics (component focus)
- * 9. Budget planning (Prévisionnel)
- * 10. Credit/Loan tracking
- * 11. Account sharing
- * 12. Completion celebration
+ * 5. Transfers between accounts
+ * 6. Access to categories (button focus)
+ * 7. Adding custom categories (button focus)
+ * 8. Export PDF (button focus)
+ * 9. Viewing analytics (component focus)
+ * 10. Budget planning (Prévisionnel)
+ * 11. Credit/Loan tracking
+ * 12. Account sharing
+ * 13. Completion celebration
  */
 export const onboardingTutorial: TutorialConfig = {
     id: 'onboarding',
@@ -47,7 +48,7 @@ export const onboardingTutorial: TutorialConfig = {
             id: 'create-account',
             icon: '💳',
             title: 'Créez vos comptes',
-            description: 'Ajoutez vos comptes bancaires pour suivre vos finances.',
+            description: 'Ajoutez vos comptes bancaires (occasionnels, obligatoires) et livrets d\'épargne pour suivre toutes vos finances.',
             targetSelector: 'create-account-button',
             route: '/comptes',
             placement: 'bottom',
@@ -62,6 +63,17 @@ export const onboardingTutorial: TutorialConfig = {
             targetSelector: 'add-transaction-button',
             route: '/transactions',
             placement: 'left',
+            mobilePlacement: 'bottom',
+            canSkip: true
+        },
+        {
+            id: 'transfers',
+            icon: '🔄',
+            title: 'Virements entre comptes',
+            description: 'Transférez de l\'argent entre vos comptes et livrets. Les livrets d\'épargne sont automatiquement exclus du budget mensuel.',
+            targetSelector: 'create-account-button',
+            route: '/comptes',
+            placement: 'bottom',
             mobilePlacement: 'bottom',
             canSkip: true
         },
