@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Calendar, RefreshCw } from 'lucide-react'
+import { CategorySelect } from '@/components/CategorySelect'
 
 const recurringTransactionSchema = z.object({
   amount: z.string().min(1, 'Montant requis'),
@@ -40,19 +41,8 @@ export default function RecurringTransactionForm({ accounts, categories: initial
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [transactionType, setTransactionType] = useState<'income' | 'expense'>('expense')
   const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('monthly')
-  const [categories, setCategories] = useState(initialCategories || [])
   const [selectedCategory, setSelectedCategory] = useState('')
   const [selectedAccount, setSelectedAccount] = useState('')
-
-  useEffect(() => {
-    // Charger les catégories si elles ne sont pas fournies
-    if (!initialCategories || initialCategories.length === 0) {
-      fetch(`/api/categories?type=${transactionType}`)
-        .then(res => res.json())
-        .then(data => setCategories(data))
-        .catch(err => console.error('Erreur chargement catégories:', err))
-    }
-  }, [transactionType, initialCategories])
 
   const {
     register,
@@ -68,8 +58,6 @@ export default function RecurringTransactionForm({ accounts, categories: initial
       recurrenceDay: '1',
     },
   })
-
-  const filteredCategories = categories.filter(cat => cat.type === transactionType)
 
   const onSubmit = async (data: RecurringTransactionFormData) => {
     setIsSubmitting(true)
@@ -174,27 +162,17 @@ export default function RecurringTransactionForm({ accounts, categories: initial
           {/* Catégorie */}
           <div className="space-y-2">
             <Label htmlFor="categoryId" className="text-sm font-semibold text-slate-200">Catégorie</Label>
-            <Select 
-              value={selectedCategory} 
-              onValueChange={(value) => {
+            <CategorySelect
+              value={selectedCategory}
+              onChange={(value) => {
                 setSelectedCategory(value)
                 setValue('categoryId', value)
               }}
-            >
-              <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white hover:bg-slate-700 transition-colors h-12">
-                <SelectValue placeholder="Sélectionner une catégorie" className="text-slate-400" />
-              </SelectTrigger>
-              <SelectContent className="bg-slate-800 border-slate-700">
-                {filteredCategories.map((category) => (
-                  <SelectItem key={category.id} value={category.id} className="text-white hover:bg-slate-700">
-                    <span className="flex items-center gap-2">
-                      <span>{category.icon}</span>
-                      <span>{category.name}</span>
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              type={transactionType}
+              accountIds={selectedAccount ? [selectedAccount] : undefined}
+              autoFill={true}
+              className="bg-slate-700/50 border-slate-600/50 text-white hover:bg-slate-700 transition-colors h-12"
+            />
             <input type="hidden" {...register('categoryId')} />
             {errors.categoryId && (
               <p className="text-sm text-red-400">{errors.categoryId.message}</p>

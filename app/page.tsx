@@ -208,9 +208,10 @@ export default function Home() {
   }
 
   // Calculer le solde courant d'un compte en appliquant ses transactions
-  // Calculer le total uniquement des comptes propres (pas les partagés)
+  // Calculer le total uniquement des comptes propres (pas les partagés) et exclure les livrets
   const ownAccounts = accounts.filter(acc => acc.isOwner !== false)
-  const totalBalance = sumBalances(ownAccounts, transactions, null, { useCurrent: false, onlyOwn: true })
+  const ownAccountsWithoutLivrets = ownAccounts.filter(acc => acc.type !== 'livret')
+  const totalBalance = sumBalances(ownAccountsWithoutLivrets, transactions, null, { useCurrent: false, onlyOwn: true })
 
   if (loading) {
     return <div className="text-center py-12">Chargement...</div>

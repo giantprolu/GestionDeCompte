@@ -99,22 +99,20 @@ export default function Sidebar({ children }: SidebarProps) {
                 </div>
               </SignedOut>
               <SignedIn>
-                <div className="flex items-center gap-3 px-4 py-3 glass rounded-xl border border-white/10">
-                  <UserButton />
-                  <span className="text-sm text-gray-300 flex-1">Mon compte</span>
-                  <Link href="/parametres">
-                    <button className="p-2 hover:bg-white/10 rounded-lg transition" title="Paramètres">
-                      <Settings className="w-4 h-4 text-gray-400 hover:text-white" />
-                    </button>
-                  </Link>
-                </div>
+                <Link href="/parametres" className="block">
+                  <div className="flex items-center gap-3 px-4 py-3 glass rounded-xl border border-white/10 hover:bg-white/5 transition-all cursor-pointer group">
+                    <UserButton />
+                    <span className="text-sm text-gray-300 flex-1">Mon compte</span>
+                    <Settings className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" />
+                  </div>
+                </Link>
               </SignedIn>
             </>
           )}
         </div>
 
         {/* Navigation */}
-        <nav className="space-y-2 flex-1" data-tutorial="sidebar-nav">
+        <nav className="space-y-2" data-tutorial="sidebar-nav">
           {filteredNavItems.map((item) => {
             const Icon = item.icon
             const isActive = pathname === item.href

@@ -9,17 +9,38 @@ export async function GET() {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
     }
 
+    // Récupérer les virements
     const { data: transfers, error } = await supabase
       .from('transfers')
-      .select(`
-        *,
-        from_account:accounts!transfers_from_account_id_fkey(id, name, type),
-        to_account:accounts!transfers_to_account_id_fkey(id, name, type)
-      `)
+      .select('*')
       .eq('user_id', userId)
       .order('date', { ascending: false })
 
     if (error) throw error
+
+    // Récupérer les informations des comptes pour chaque virement
+    if (transfers && transfers.length > 0) {
+      const accountIds = new Set<string>()
+      transfers.forEach(t => {
+        accountIds.add(t.from_account_id)
+        accountIds.add(t.to_account_id)
+      })
+
+      const { data: accounts } = await supabase
+        .from('accounts')
+        .select('id, name, type')
+        .in('id', Array.from(accountIds))
+
+      // Enrichir les virements avec les infos des comptes
+      const accountMap = new Map(accounts?.map(a => [a.id, a]) || [])
+      const enrichedTransfers = transfers.map(t => ({
+        ...t,
+        from_account: accountMap.get(t.from_account_id),
+        to_account: accountMap.get(t.to_account_id)
+      }))
+
+      return NextResponse.json(enrichedTransfers)
+    }
 
     return NextResponse.json(transfers || [])
   } catch (error) {
@@ -73,16 +94,32 @@ export async function POST(request: Request) {
         date: date || new Date().toISOString(),
         note: note || null,
       })
-      .select(`
-        *,
-        from_account:accounts!transfers_from_account_id_fkey(id, name, type),
-        to_account:accounts!transfers_to_account_id_fkey(id, name, type)
-      `)
+      .select()
       .single()
 
     if (error) {
       console.error('Insert error:', error)
       throw error
+    }
+
+    // Récupérer les informations des comptes
+    const { data: fromAccountData } = await supabase
+      .from('accounts')
+      .select('id, name, type')
+      .eq('id', fromAccountId)
+      .single()
+
+    const { data: toAccountData } = await supabase
+      .from('accounts')
+      .select('id, name, type')
+      .eq('id', toAccountId)
+      .single()
+
+    // Enrichir le virement avec les infos des comptes
+    const enrichedTransfer = {
+      ...transfer,
+      from_account: fromAccountData,
+      to_account: toAccountData
     }
 
     // Mettre à jour les soldes des comptes
@@ -119,7 +156,7 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json(transfer)
+    return NextResponse.json(enrichedTransfer)
   } catch (error) {
     console.error('Error:', error)
     return NextResponse.json({ error: 'Erreur lors de la création du virement' }, { status: 500 })

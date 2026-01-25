@@ -190,6 +190,42 @@ export async function POST(request: Request) {
     // Note: Les transactions futures seront prises en compte automatiquement
     // quand leur date arrivera (via le calcul currentBalance dans GET /api/accounts)
 
+    // Update lastUsedCategory in user_settings (non-blocking)
+    try {
+      // Get current user_settings
+      const { data: currentSettings } = await supabase
+        .from('user_settings')
+        .select('spend_targets')
+        .eq('user_id', userId)
+        .maybeSingle()
+
+      const existingTargets = currentSettings?.spend_targets || {}
+      const existingLastUsed = existingTargets.lastUsedCategory || {}
+
+      // Merge with new lastUsedCategory
+      const updatedTargets = {
+        ...existingTargets,
+        lastUsedCategory: {
+          ...existingLastUsed,
+          [body.type]: body.categoryId,
+        },
+      }
+
+      // Upsert user_settings
+      await supabase
+        .from('user_settings')
+        .upsert(
+          {
+            user_id: userId,
+            spend_targets: updatedTargets,
+          },
+          { onConflict: 'user_id' }
+        )
+    } catch (settingsError) {
+      // Don't fail the transaction creation if settings update fails
+      console.error('Failed to update lastUsedCategory:', settingsError)
+    }
+
     // Mapper les champs pour correspondre au front-end
     const mappedTransaction = {
       id: transaction.id,
