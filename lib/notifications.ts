@@ -4,14 +4,39 @@ import webpush, { PushSubscription as WebPushSubscription } from 'web-push'
 import { supabase } from '@/lib/db'
 
 // Configure VAPID details
-const vapidConfigured = !!(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY)
+const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY
+const vapidConfigured = !!(vapidPublicKey && vapidPrivateKey)
+
+// Log VAPID configuration status (without exposing keys)
+console.log('[Notifications] VAPID Configuration:', {
+  publicKeyPresent: !!vapidPublicKey,
+  publicKeyLength: vapidPublicKey?.length || 0,
+  privateKeyPresent: !!vapidPrivateKey,
+  privateKeyLength: vapidPrivateKey?.length || 0,
+  configured: vapidConfigured,
+  nodeEnv: process.env.NODE_ENV
+})
 
 if (vapidConfigured) {
-  webpush.setVapidDetails(
-    'mailto:contact@moneyflow.app',
-    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-    process.env.VAPID_PRIVATE_KEY!
-  )
+  try {
+    webpush.setVapidDetails(
+      'mailto:contact@moneyflow.app',
+      vapidPublicKey,
+      vapidPrivateKey
+    )
+    console.log('[Notifications] ✅ VAPID details configured successfully')
+  } catch (error) {
+    console.error('[Notifications] 🔴 Error configuring VAPID details:', error)
+  }
+} else {
+  console.error('[Notifications] 🔴 VAPID keys are missing!')
+  if (!vapidPublicKey) {
+    console.error('[Notifications] 🔴 Missing: NEXT_PUBLIC_VAPID_PUBLIC_KEY')
+  }
+  if (!vapidPrivateKey) {
+    console.error('[Notifications] 🔴 Missing: VAPID_PRIVATE_KEY')
+  }
 }
 
 // Types de notifications critiques
@@ -157,14 +182,23 @@ export async function sendPushNotification(
   userId: string,
   notification: CriticalNotification
 ): Promise<{ success: boolean; error?: string }> {
-  try {    
+  try {
+    console.log('[Notifications] Attempting to send push notification:', {
+      userId,
+      type: notification.type,
+      title: notification.title
+    })
+
     if (!vapidConfigured) {
+      console.error('[Notifications] 🔴 Cannot send notification: VAPID not configured')
       return { success: false, error: 'VAPID not configured' }
     }
 
     const subscriptions = await getUserSubscriptions(userId)
-    
+    console.log('[Notifications] Found subscriptions:', subscriptions.length)
+
     if (subscriptions.length === 0) {
+      console.warn('[Notifications] ⚠️ No subscriptions found for user:', userId)
       return { success: false, error: 'No subscriptions found' }
     }
 
@@ -178,20 +212,49 @@ export async function sendPushNotification(
       data: notification.data || {},
     })
 
+    console.log('[Notifications] Sending notification to', subscriptions.length, 'subscription(s)')
+
     const results = await Promise.allSettled(
       subscriptions.map(sub => webpush.sendNotification(sub, payload))
     )
 
     const successCount = results.filter(r => r.status === 'fulfilled').length
     const failedResults = results.filter(r => r.status === 'rejected')
-    
+
+    console.log('[Notifications] Send results:', {
+      total: results.length,
+      successful: successCount,
+      failed: failedResults.length
+    })
+
+    // Log failed notifications with details
+    if (failedResults.length > 0) {
+      failedResults.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          console.error(`[Notifications] 🔴 Failed to send to subscription ${index}:`, {
+            reason: result.reason?.message || result.reason,
+            statusCode: (result.reason as any)?.statusCode,
+            body: (result.reason as any)?.body
+          })
+        }
+      })
+    }
+
     if (successCount === 0) {
+      console.error('[Notifications] 🔴 All notifications failed')
       return { success: false, error: 'All notifications failed' }
     }
 
+    console.log('[Notifications] ✅ Notification sent successfully')
     return { success: true }
   } catch (error) {
-    console.error('Error sending push notification:', error)
+    console.error('[Notifications] 🔴 Error sending push notification:', error)
+    if (error instanceof Error) {
+      console.error('[Notifications] 🔴 Error details:', {
+        message: error.message,
+        stack: error.stack
+      })
+    }
     return { success: false, error: 'Failed to send notification' }
   }
 }
