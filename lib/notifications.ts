@@ -215,7 +215,14 @@ export async function sendPushNotification(
     console.log('[Notifications] Sending notification to', subscriptions.length, 'subscription(s)')
 
     const results = await Promise.allSettled(
-      subscriptions.map(sub => webpush.sendNotification(sub, payload))
+      subscriptions.map((sub, index) =>
+        webpush.sendNotification(sub, payload).catch(error => {
+          // Include subscription index in error for cleanup
+          error.subscriptionIndex = index
+          error.subscriptionEndpoint = sub.endpoint
+          throw error
+        })
+      )
     )
 
     const successCount = results.filter(r => r.status === 'fulfilled').length
@@ -227,26 +234,80 @@ export async function sendPushNotification(
       failed: failedResults.length
     })
 
-    // Log failed notifications with details
+    // Track invalid subscriptions to remove
+    const invalidSubscriptions: string[] = []
+
+    // Log failed notifications with details and identify invalid subscriptions
     if (failedResults.length > 0) {
       failedResults.forEach((result, index) => {
         if (result.status === 'rejected') {
+          const error = result.reason as any
+          const statusCode = error?.statusCode
+          const endpoint = error?.subscriptionEndpoint
+
           console.error(`[Notifications] 🔴 Failed to send to subscription ${index}:`, {
-            reason: result.reason?.message || result.reason,
-            statusCode: (result.reason as any)?.statusCode,
-            body: (result.reason as any)?.body
+            reason: error?.message || result.reason,
+            statusCode: statusCode,
+            body: error?.body,
+            endpoint: endpoint?.substring(0, 50) + '...'
           })
+
+          // Status codes 403, 404, 410 indicate invalid/expired subscriptions
+          // 403: BadJwtToken (VAPID keys changed)
+          // 404: Subscription not found
+          // 410: Subscription expired
+          if (statusCode === 403 || statusCode === 404 || statusCode === 410) {
+            if (endpoint) {
+              console.warn('[Notifications] ⚠️ Marking subscription as invalid:', endpoint.substring(0, 50) + '...')
+              invalidSubscriptions.push(endpoint)
+            }
+          }
         }
       })
+
+      // Clean up invalid subscriptions from database
+      if (invalidSubscriptions.length > 0) {
+        console.log('[Notifications] 🧹 Cleaning up', invalidSubscriptions.length, 'invalid subscription(s)')
+        try {
+          const { error: deleteError } = await supabase
+            .from('push_subscriptions')
+            .delete()
+            .eq('user_id', userId)
+            .in('endpoint', invalidSubscriptions)
+
+          if (deleteError) {
+            console.error('[Notifications] 🔴 Error deleting invalid subscriptions:', deleteError)
+          } else {
+            console.log('[Notifications] ✅ Cleaned up invalid subscriptions')
+          }
+        } catch (cleanupError) {
+          console.error('[Notifications] 🔴 Error during cleanup:', cleanupError)
+        }
+      }
     }
 
     if (successCount === 0) {
       console.error('[Notifications] 🔴 All notifications failed')
+
+      // If all failed due to invalid subscriptions, provide helpful message
+      if (invalidSubscriptions.length === results.length) {
+        return {
+          success: false,
+          error: 'All subscriptions invalid - please re-enable notifications',
+          invalidSubscriptionsRemoved: invalidSubscriptions.length
+        }
+      }
+
       return { success: false, error: 'All notifications failed' }
     }
 
-    console.log('[Notifications] ✅ Notification sent successfully')
-    return { success: true }
+    console.log('[Notifications] ✅ Notification sent successfully to', successCount, 'subscription(s)')
+
+    return {
+      success: true,
+      successCount,
+      invalidSubscriptionsRemoved: invalidSubscriptions.length
+    }
   } catch (error) {
     console.error('[Notifications] 🔴 Error sending push notification:', error)
     if (error instanceof Error) {
