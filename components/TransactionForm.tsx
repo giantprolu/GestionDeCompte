@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { CategorySelect } from '@/components/CategorySelect'
 
 const transactionSchema = z.object({
   amount: z.string().min(1, 'Le montant est requis'),
@@ -31,14 +32,6 @@ const transactionSchema = z.object({
 
 type TransactionFormData = z.infer<typeof transactionSchema>
 
-interface Category {
-  id: string
-  name: string
-  type: string
-  icon: string
-  color: string
-}
-
 interface Account {
   id: string
   name: string
@@ -52,7 +45,6 @@ interface TransactionFormProps {
 
 export default function TransactionForm({ accounts, onSuccess, onCancel }: TransactionFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [categories, setCategories] = useState<Category[]>([])
   const [transactionType, setTransactionType] = useState<'income' | 'expense'>('expense')
   const [isRecurring, setIsRecurring] = useState(false)
 
@@ -68,28 +60,14 @@ export default function TransactionForm({ accounts, onSuccess, onCancel }: Trans
       date: new Date().toISOString().split('T')[0],
       type: 'expense',
       isRecurring: false,
+      categoryId: '',
+      accountId: '',
     },
   })
 
   const accountId = watch('accountId')
   const categoryId = watch('categoryId')
   const recurrenceFrequency = watch('recurrenceFrequency')
-
-  useEffect(() => {
-    fetchCategories(transactionType)
-  }, [transactionType])
-
-  const fetchCategories = async (type: 'income' | 'expense') => {
-    try {
-      const res = await fetch(`/api/categories?type=${type}`)
-      if (res.ok) {
-        const data = await res.json()
-        setCategories(data)
-      }
-    } catch (error) {
-      console.error('Erreur lors du chargement des catégories:', error)
-    }
-  }
 
   const handleTypeChange = (type: 'income' | 'expense') => {
     setTransactionType(type)
@@ -188,21 +166,14 @@ export default function TransactionForm({ accounts, onSuccess, onCancel }: Trans
 
           <div className="space-y-2">
             <Label htmlFor="categoryId" className="text-sm font-semibold text-slate-200">Catégorie</Label>
-            <Select value={categoryId} onValueChange={(value) => setValue('categoryId', value)}>
-              <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white hover:bg-slate-700 transition-colors h-11">
-                <SelectValue placeholder="Sélectionner une catégorie" className="text-slate-400" />
-              </SelectTrigger>
-              <SelectContent className="bg-slate-800 border-slate-700">
-                {categories.map((category) => (
-                  <SelectItem key={category.id} value={category.id} className="text-white hover:bg-slate-700">
-                    <span className="flex items-center gap-2">
-                      <span>{category.icon}</span>
-                      <span>{category.name}</span>
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <CategorySelect
+              value={categoryId || ''}
+              onChange={(value) => setValue('categoryId', value)}
+              type={transactionType}
+              accountIds={accountId ? [accountId] : undefined}
+              autoFill={true}
+              className="bg-slate-700/50 border-slate-600/50 text-white hover:bg-slate-700 transition-colors h-11"
+            />
             {errors.categoryId && (
               <p className="text-sm text-red-400 mt-1">{errors.categoryId.message}</p>
             )}

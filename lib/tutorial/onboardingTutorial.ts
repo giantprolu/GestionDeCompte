@@ -71,7 +71,7 @@ export const onboardingTutorial: TutorialConfig = {
             icon: '🔄',
             title: 'Virements entre comptes',
             description: 'Transférez de l\'argent entre vos comptes et livrets. Les livrets d\'épargne sont automatiquement exclus du budget mensuel.',
-            targetSelector: 'create-account-button',
+            targetSelector: 'transfer-button',
             route: '/comptes',
             placement: 'bottom',
             mobilePlacement: 'bottom',

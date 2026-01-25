@@ -248,6 +248,7 @@ export default function ComptesPage() {
             <Button
               onClick={() => setShowTransferForm(!showTransferForm)}
               disabled={accounts.length < 2}
+              data-tutorial="transfer-button"
               className={`w-full sm:w-auto font-semibold shadow-lg hover:shadow-xl transition-all duration-200 px-5 py-5 text-base ${showTransferForm
                   ? 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700'
                   : 'bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700'

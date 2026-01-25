@@ -69,8 +69,8 @@ export function useElementReady(
                     // Update rect after scroll animation
                     setTimeout(() => {
                         setRect(el.getBoundingClientRect())
-                    }, 400)
-                }, 100)
+                    }, 200)
+                }, 50)
             }
             
             setElement(el)
@@ -116,7 +116,7 @@ export function useElementReady(
 
         // Maximum retry count to prevent infinite loops
         let retryCount = 0
-        const maxRetries = 50 // 5 seconds max (50 * 100ms)
+        const maxRetries = 20 // 1 second max (20 * 50ms) - faster tutorial transitions
 
         // Set up MutationObserver to watch for element
         observerRef.current = new MutationObserver((mutations) => {
@@ -141,7 +141,7 @@ export function useElementReady(
             const found = findElement()
             if (!found && retryCount < maxRetries) {
                 retryCount++
-                retryTimeoutRef.current = setTimeout(retryFind, 100)
+                retryTimeoutRef.current = setTimeout(retryFind, 50)
             } else if (!found) {
                 // Element not found after max retries - mark as ready anyway
                 // This prevents infinite loading for elements that don't exist

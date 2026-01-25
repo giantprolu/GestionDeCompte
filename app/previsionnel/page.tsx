@@ -9,6 +9,7 @@ import { MoneyInput } from '@/components/ui/money-input'
 import { Button } from '@/components/ui/button'
 import { useSelectedMonth } from '@/lib/useSelectedMonth'
 import { useUserSettings } from '@/components/AppWrapper'
+import { useTutorialActive } from '@/lib/tutorial'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Calculator, 
@@ -39,6 +40,7 @@ export default function PrevisionnelPage() {
   const { isSignedIn, isLoaded } = useUser()
   const router = useRouter()
   const { userType, isLoading: isLoadingSettings } = useUserSettings()
+  const isTutorialActive = useTutorialActive()
   const [activeTab, setActiveTab] = useState<'variable' | 'fixed' | 'reco'>('variable')
   const [recoVisible, setRecoVisible] = useState(false)
   const fmt = (n: number) => new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + ' €'
@@ -173,10 +175,24 @@ export default function PrevisionnelPage() {
   const categoriesOverBudget = totals.filter(t => targets[t.category] && t.total > targets[t.category]).length
   const categoriesUnderBudget = totals.filter(t => targets[t.category] && t.total <= targets[t.category]).length
   
+  // Mock data for tutorial mode when no accounts exist
+  const mockSummary = isTutorialActive && !summary ? {
+    totalIncome: 2500,
+    totalFixedExpenses: 1200,
+    totalVariableExpenses: 800,
+    availableForVariable: 1300,
+    potentialSavings: 500,
+    totalBalanceIncluded: 800,
+    totalBalanceExcluded: 0,
+    totalBalanceAll: 800
+  } : null
+
+  const effectiveSummary = summary || mockSummary
+
   // Budget disponible et épargne
-  const availableForVariable = summary?.availableForVariable || 0
+  const availableForVariable = effectiveSummary?.availableForVariable || 0
   // L'épargne potentielle = solde total des comptes inclus (cohérent avec Total disponible du dashboard - comptes exclus)
-  const potentialSavings = summary?.totalBalanceIncluded || 0
+  const potentialSavings = effectiveSummary?.totalBalanceIncluded || 0
   const remainingBudget = availableForVariable - totalVariableSpent
 
   return (
@@ -215,7 +231,7 @@ export default function PrevisionnelPage() {
       </motion.div>
 
       {/* Carte épargne potentielle - mise en avant */}
-      {summary && (
+      {effectiveSummary && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -246,13 +262,13 @@ export default function PrevisionnelPage() {
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                   <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/50">
                     <p className="text-slate-400 text-xs">Revenus</p>
-                    <p className="text-white font-semibold">{fmt(summary.totalIncome)}</p>
+                    <p className="text-white font-semibold">{fmt(effectiveSummary.totalIncome)}</p>
                   </div>
                   <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/50">
                     <p className="text-slate-400 text-xs flex items-center gap-1">
                       <Lock className="w-3 h-3" /> Charges fixes
                     </p>
-                    <p className="text-orange-400 font-semibold">-{fmt(summary.totalFixedExpenses)}</p>
+                    <p className="text-orange-400 font-semibold">-{fmt(effectiveSummary.totalFixedExpenses)}</p>
                   </div>
                   <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/50 col-span-2 md:col-span-1">
                     <p className="text-slate-400 text-xs flex items-center gap-1">
