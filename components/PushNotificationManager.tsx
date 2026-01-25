@@ -1,5 +1,32 @@
 'use client'
 
+/**
+ * PushNotificationManager - Gère l'activation/désactivation des notifications push PWA
+ *
+ * IMPORTANT - Configuration requise pour la production:
+ *
+ * 1. Variables d'environnement VAPID:
+ *    - NEXT_PUBLIC_VAPID_PUBLIC_KEY : Clé publique VAPID (accessible côté client)
+ *    - VAPID_PRIVATE_KEY : Clé privée VAPID (serveur uniquement)
+ *
+ * 2. Ces variables DOIVENT être définies au moment du build:
+ *    - Dans Vercel/Netlify: Ajouter dans les variables d'environnement du projet
+ *    - En local: Ajouter dans .env.local
+ *
+ * 3. HTTPS requis en production:
+ *    - Les notifications push nécessitent HTTPS (sauf localhost en dev)
+ *    - Vérifier que le certificat SSL est valide
+ *
+ * 4. Service Worker:
+ *    - Le fichier /public/sw.js doit être accessible
+ *    - Vérifier dans DevTools > Application > Service Workers
+ *
+ * Débogage:
+ * - Activer la console du navigateur pour voir les logs détaillés [PushManager]
+ * - Vérifier DevTools > Application > Manifest pour la PWA
+ * - Tester avec chrome://serviceworker-internals/
+ */
+
 import { useState, useEffect, useCallback } from 'react'
 import { useUser } from '@clerk/nextjs'
 import { Button } from '@/components/ui/button'
@@ -85,15 +112,32 @@ export default function PushNotificationManager({
 
   useEffect(() => {
     const init = async () => {
-      // Check VAPID key first
-      if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
-        console.error('VAPID Public Key is missing!')
+      // Check VAPID key first with detailed logging
+      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+      console.log('[PushManager] Init - VAPID key check:', {
+        hasKey: !!vapidKey,
+        keyLength: vapidKey?.length || 0,
+        nodeEnv: process.env.NODE_ENV,
+        isClient: typeof window !== 'undefined'
+      })
+
+      if (!vapidKey) {
+        console.error('[PushManager] 🔴 VAPID Public Key is missing!')
+        console.error('[PushManager] 🔴 Environment:', {
+          isDev: process.env.NODE_ENV === 'development',
+          isProd: process.env.NODE_ENV === 'production'
+        })
         setVapidError(true)
         setIsLoading(false)
         return
       }
 
       const supported = 'serviceWorker' in navigator && 'PushManager' in window
+      console.log('[PushManager] Browser support check:', {
+        serviceWorker: 'serviceWorker' in navigator,
+        pushManager: 'PushManager' in window,
+        supported
+      })
       setIsSupported(supported)
       
       if (!supported) {
@@ -115,16 +159,26 @@ export default function PushNotificationManager({
           if (hasServer && !sub && Notification.permission === 'granted') {
             // Réinscrire silencieusement
             try {
+              console.log('[PushManager] Attempting to restore subscription...')
               const registration = await navigator.serviceWorker.ready
+              console.log('[PushManager] Service worker ready, subscribing...')
               const newSub = await registration.pushManager.subscribe({
                 userVisibleOnly: true,
                 applicationServerKey: urlBase64ToUint8Array(
                   process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
                 ),
               })
+              console.log('[PushManager] ✅ Subscription restored successfully')
               setSubscription(newSub)
             } catch (e) {
-              console.error('Failed to restore subscription:', e)
+              console.error('[PushManager] 🔴 Failed to restore subscription:', e)
+              if (e instanceof Error) {
+                console.error('[PushManager] 🔴 Error details:', {
+                  name: e.name,
+                  message: e.message,
+                  stack: e.stack
+                })
+              }
             }
           }
         }
@@ -139,6 +193,8 @@ export default function PushNotificationManager({
   }, [registerServiceWorker, checkServerSubscription, isLoaded, user])
 
   const subscribeToPush = async () => {
+    console.log('[PushManager] 🔵 Subscribe to push called')
+
     if (!user) {
       console.error('[PushManager] 🔴 User is missing', { user });
       alert('Erreur : Utilisateur non connecté ou non chargé.');
@@ -151,27 +207,48 @@ export default function PushNotificationManager({
       return;
     }
 
+    const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+    console.log('[PushManager] 🔵 VAPID key check:', {
+      hasKey: !!vapidKey,
+      keyLength: vapidKey?.length || 0
+    })
+
+    if (!vapidKey) {
+      console.error('[PushManager] 🔴 VAPID key missing at subscribe time')
+      alert('Configuration des notifications manquante (Clé VAPID)');
+      return;
+    }
+
     setIsLoading(true);
     try {
+      console.log('[PushManager] 🔵 Requesting notification permission...')
       // Request permission
       const permissionResult = await Notification.requestPermission();
+      console.log('[PushManager] 🔵 Permission result:', permissionResult)
       setPermission(permissionResult);
 
       if (permissionResult !== 'granted') {
+        console.log('[PushManager] ⚠️ Permission not granted')
         setIsLoading(false);
         return;
       }
 
+      console.log('[PushManager] 🔵 Waiting for service worker ready...')
       const registration = await navigator.serviceWorker.ready
+      console.log('[PushManager] 🔵 Service worker ready, subscribing to push manager...')
+
       const sub = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(
-          process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
-        ),
+        applicationServerKey: urlBase64ToUint8Array(vapidKey),
       });
+      console.log('[PushManager] ✅ Push subscription created:', {
+        endpoint: sub.endpoint,
+        hasKeys: !!(sub as any).keys
+      })
       setSubscription(sub);
 
       // Sauvegarder via l'API (qui stocke en base de données)
+      console.log('[PushManager] 🔵 Saving subscription to server...')
       const serializedSub = JSON.parse(JSON.stringify(sub));
       const saveRes = await fetch('/api/notifications', {
         method: 'POST',
@@ -179,19 +256,28 @@ export default function PushNotificationManager({
         body: JSON.stringify(serializedSub),
       });
 
-
       if (!saveRes.ok) {
         const errorBody = await saveRes.text();
         console.error('[PushManager] 🔴 API Error body:', errorBody);
         throw new Error(`Failed to save subscription: ${saveRes.status} ${saveRes.statusText}`);
       }
 
+      console.log('[PushManager] ✅ Subscription saved to server')
       setHasServerSubscription(true);
 
       // Vérifier immédiatement les notifications critiques
+      console.log('[PushManager] 🔵 Checking for critical notifications...')
       await fetch('/api/notifications/check');
+      console.log('[PushManager] ✅ Subscription process complete!')
     } catch (error) {
       console.error('[PushManager] 🔴 Error subscribing to push:', error);
+      if (error instanceof Error) {
+        console.error('[PushManager] 🔴 Error details:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        })
+      }
       alert('Erreur lors de l\'activation des notifications. Vérifiez la console pour plus de détails.');
     }
     setIsLoading(false);
@@ -224,10 +310,32 @@ export default function PushNotificationManager({
 
   // Fallback UI for missing VAPID
   if (vapidError) {
+    const isDev = process.env.NODE_ENV === 'development'
     return (
-      <div className={`flex items-center gap-2 text-sm text-red-400 bg-red-500/10 p-2 rounded-lg border border-red-500/20 ${className}`}>
-        <AlertCircle className="h-4 w-4 flex-shrink-0" />
-        <span>Erreur de configuration serveur (Clés VAPID manquantes)</span>
+      <div className={`rounded-xl border border-red-500/20 bg-red-500/10 p-4 ${className}`}>
+        <div className="flex items-center gap-2 text-red-400 mb-2">
+          <AlertCircle className="h-5 w-5 flex-shrink-0" />
+          <span className="font-medium">Configuration manquante</span>
+        </div>
+        <p className="text-xs text-red-300/80 mb-2">
+          Les clés VAPID pour les notifications push ne sont pas configurées.
+        </p>
+        {isDev && (
+          <div className="text-xs text-red-300/60 space-y-1">
+            <p className="font-medium">Pour corriger en développement:</p>
+            <ol className="list-decimal ml-4 space-y-0.5">
+              <li>Créer un fichier .env.local à la racine du projet</li>
+              <li>Ajouter: NEXT_PUBLIC_VAPID_PUBLIC_KEY=votre_clé_publique</li>
+              <li>Ajouter: VAPID_PRIVATE_KEY=votre_clé_privée</li>
+              <li>Redémarrer le serveur de développement</li>
+            </ol>
+          </div>
+        )}
+        {!isDev && (
+          <div className="text-xs text-red-300/60 space-y-1">
+            <p>Contactez l'administrateur système pour configurer les variables d'environnement.</p>
+          </div>
+        )}
       </div>
     )
   }

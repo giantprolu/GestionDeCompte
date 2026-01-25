@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/db'
 import { auth } from '@clerk/nextjs/server'
+import { jsPDF } from 'jspdf'
 
 export async function GET(request: Request) {
   try {
@@ -171,7 +172,207 @@ export async function GET(request: Request) {
       })
     }
 
-    // Retourner les données en JSON si format !== csv
+    if (format === 'pdf') {
+      // Créer un nouveau document PDF avec jsPDF
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      })
+
+      const pageWidth = doc.internal.pageSize.getWidth()
+      const pageHeight = doc.internal.pageSize.getHeight()
+      const margin = 15
+      let yPos = margin
+
+      // Fonction pour vérifier et ajouter une nouvelle page si nécessaire
+      const checkPageBreak = (neededSpace = 20) => {
+        if (yPos + neededSpace > pageHeight - margin) {
+          doc.addPage()
+          yPos = margin
+          return true
+        }
+        return false
+      }
+
+      // En-tête du document
+      doc.setFontSize(20)
+      doc.setFont('helvetica', 'bold')
+      doc.text('EXPORT MONEYFLOW', pageWidth / 2, yPos, { align: 'center' })
+      yPos += 10
+
+      const exportDate = new Date().toLocaleString('fr-FR', {
+        dateStyle: 'full',
+        timeStyle: 'short'
+      })
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      doc.text(exportDate, pageWidth / 2, yPos, { align: 'center' })
+      yPos += 6
+
+      const periodText = `Période: ${startDate ? new Date(startDate).toLocaleDateString('fr-FR') : 'Début'} - ${endDate ? new Date(endDate).toLocaleDateString('fr-FR') : "Aujourd'hui"}`
+      doc.text(periodText, pageWidth / 2, yPos, { align: 'center' })
+      yPos += 12
+
+      // Export des comptes
+      if (dataType === 'all' || dataType === 'accounts') {
+        checkPageBreak(30)
+
+        doc.setFontSize(14)
+        doc.setFont('helvetica', 'bold')
+        doc.text('COMPTES', margin, yPos)
+        yPos += 8
+
+        const totalInitial = (accounts || []).reduce((sum, acc) => sum + (acc.initial_balance || 0), 0)
+
+        doc.setFontSize(9)
+        for (const account of accounts || []) {
+          checkPageBreak(15)
+
+          doc.setFont('helvetica', 'bold')
+          doc.text(`${account.name} - ${account.type === 'obligatoire' ? 'Obligatoire' : 'Occasionnel'}`, margin, yPos)
+          yPos += 5
+
+          doc.setFont('helvetica', 'normal')
+          doc.text(`Solde initial: ${account.initial_balance.toFixed(2)} €`, margin + 5, yPos)
+          yPos += 4
+          doc.text(`Exclu prévisionnel: ${account.exclude_from_previsionnel ? 'Oui' : 'Non'}`, margin + 5, yPos)
+          yPos += 6
+        }
+
+        doc.setFont('helvetica', 'bold')
+        doc.text(`Total soldes initiaux: ${totalInitial.toFixed(2)} €`, margin, yPos)
+        yPos += 10
+      }
+
+      // Export des transactions
+      if (dataType === 'all' || dataType === 'transactions') {
+        checkPageBreak(30)
+
+        doc.setFontSize(14)
+        doc.setFont('helvetica', 'bold')
+        doc.text('TRANSACTIONS', margin, yPos)
+        yPos += 8
+
+        let totalIncome = 0
+        let totalExpense = 0
+        let transactionCount = 0
+
+        doc.setFontSize(8)
+        for (const txn of transactions || []) {
+          checkPageBreak(18)
+
+          const account = txn.account as { name: string; type: string } | null
+          const category = txn.category as { name: string; icon: string; type: string } | null
+          const txnDate = new Date(txn.date)
+          const date = txnDate.toLocaleDateString('fr-FR')
+          const type = txn.type === 'income' ? 'Revenu' : 'Dépense'
+
+          if (txn.type === 'income') totalIncome += txn.amount
+          else totalExpense += txn.amount
+          transactionCount++
+
+          doc.setFont('helvetica', 'bold')
+          doc.text(`${date} - ${type} - ${txn.amount.toFixed(2)} €`, margin, yPos)
+          yPos += 4
+
+          doc.setFont('helvetica', 'normal')
+          if (category) {
+            doc.text(`Catégorie: ${category.name}`, margin + 5, yPos)
+            yPos += 3.5
+          }
+          if (account) {
+            doc.text(`Compte: ${account.name}`, margin + 5, yPos)
+            yPos += 3.5
+          }
+          if (txn.note) {
+            const noteLines = doc.splitTextToSize(`Note: ${txn.note}`, pageWidth - margin * 2 - 5)
+            doc.text(noteLines, margin + 5, yPos)
+            yPos += noteLines.length * 3.5
+          }
+          yPos += 3
+        }
+
+        checkPageBreak(25)
+        yPos += 3
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'bold')
+        doc.text('RÉSUMÉ TRANSACTIONS', margin, yPos)
+        yPos += 6
+
+        doc.setFontSize(9)
+        doc.setFont('helvetica', 'normal')
+        doc.text(`Total revenus: ${totalIncome.toFixed(2)} €`, margin + 5, yPos)
+        yPos += 4
+        doc.text(`Total dépenses: ${totalExpense.toFixed(2)} €`, margin + 5, yPos)
+        yPos += 4
+        doc.text(`Solde net: ${(totalIncome - totalExpense).toFixed(2)} €`, margin + 5, yPos)
+        yPos += 4
+        doc.text(`Nombre de transactions: ${transactionCount}`, margin + 5, yPos)
+        yPos += 10
+      }
+
+      // Export des crédits/prêts
+      if ((dataType === 'all') && credits && credits.length > 0) {
+        checkPageBreak(30)
+
+        doc.setFontSize(14)
+        doc.setFont('helvetica', 'bold')
+        doc.text('CRÉDITS / PRÊTS', margin, yPos)
+        yPos += 8
+
+        doc.setFontSize(9)
+        for (const credit of credits) {
+          checkPageBreak(20)
+
+          const remaining = credit.initial_amount - credit.repaid_amount
+          const progress = ((credit.repaid_amount / credit.initial_amount) * 100).toFixed(1)
+
+          doc.setFont('helvetica', 'bold')
+          doc.text(credit.name, margin, yPos)
+          yPos += 5
+
+          doc.setFont('helvetica', 'normal')
+          doc.text(`Montant initial: ${credit.initial_amount.toFixed(2)} €`, margin + 5, yPos)
+          yPos += 4
+          doc.text(`Montant remboursé: ${credit.repaid_amount.toFixed(2)} €`, margin + 5, yPos)
+          yPos += 4
+          doc.text(`Reste à payer: ${remaining.toFixed(2)} €`, margin + 5, yPos)
+          yPos += 4
+          doc.text(`Progression: ${progress}%`, margin + 5, yPos)
+          yPos += 6
+        }
+      }
+
+      // Pied de page sur chaque page
+      const totalPages = doc.getNumberOfPages()
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i)
+        doc.setFontSize(8)
+        doc.setFont('helvetica', 'normal')
+        doc.text(
+          `Généré par MoneyFlow le ${new Date().toLocaleString('fr-FR')} - Page ${i}/${totalPages}`,
+          pageWidth / 2,
+          pageHeight - 10,
+          { align: 'center' }
+        )
+      }
+
+      // Générer le PDF en tant que buffer
+      const pdfOutput = doc.output('arraybuffer')
+      const pdfBuffer = Buffer.from(pdfOutput)
+
+      // Retourner le fichier PDF
+      return new NextResponse(pdfBuffer, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="export-moneyflow-${new Date().toISOString().split('T')[0]}.pdf"`,
+        },
+      })
+    }
+
+    // Retourner les données en JSON si format !== csv && format !== pdf
     return NextResponse.json({
       accounts: accounts || [],
       transactions: transactions || [],

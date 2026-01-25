@@ -12,18 +12,19 @@ export default function ExportData() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [dataType, setDataType] = useState<'all' | 'transactions' | 'accounts'>('all')
+  const [format, setFormat] = useState<'csv' | 'json' | 'pdf'>('csv')
 
   const handleExport = async () => {
     setIsExporting(true)
     try {
       const params = new URLSearchParams()
-      params.append('format', 'csv')
+      params.append('format', format)
       params.append('type', dataType)
       if (startDate) params.append('startDate', startDate)
       if (endDate) params.append('endDate', endDate)
 
       const response = await fetch(`/api/export?${params.toString()}`)
-      
+
       if (!response.ok) {
         throw new Error('Erreur lors de l\'export')
       }
@@ -33,7 +34,8 @@ export default function ExportData() {
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `export-finances-${new Date().toISOString().split('T')[0]}.csv`
+      const fileExtension = format === 'json' ? 'json' : format === 'pdf' ? 'pdf' : 'csv'
+      a.download = `export-finances-${new Date().toISOString().split('T')[0]}.${fileExtension}`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -61,7 +63,7 @@ export default function ExportData() {
         {/* Type de données */}
         <div className="space-y-2">
           <Label className="text-slate-200">Données à exporter</Label>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <button
               type="button"
               onClick={() => setDataType('all')}
@@ -98,8 +100,48 @@ export default function ExportData() {
           </div>
         </div>
 
+        {/* Format d'export */}
+        <div className="space-y-2">
+          <Label className="text-slate-200">Format d&apos;export</Label>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <button
+              type="button"
+              onClick={() => setFormat('csv')}
+              className={`px-3 py-2 rounded-lg border-2 font-medium text-sm transition-all ${
+                format === 'csv'
+                  ? 'border-emerald-500 bg-emerald-500/20 text-emerald-300'
+                  : 'border-slate-600 bg-slate-700 text-slate-300 hover:border-slate-500'
+              }`}
+            >
+              📄 CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => setFormat('json')}
+              className={`px-3 py-2 rounded-lg border-2 font-medium text-sm transition-all ${
+                format === 'json'
+                  ? 'border-amber-500 bg-amber-500/20 text-amber-300'
+                  : 'border-slate-600 bg-slate-700 text-slate-300 hover:border-slate-500'
+              }`}
+            >
+              📋 JSON
+            </button>
+            <button
+              type="button"
+              onClick={() => setFormat('pdf')}
+              className={`px-3 py-2 rounded-lg border-2 font-medium text-sm transition-all ${
+                format === 'pdf'
+                  ? 'border-rose-500 bg-rose-500/20 text-rose-300'
+                  : 'border-slate-600 bg-slate-700 text-slate-300 hover:border-slate-500'
+              }`}
+            >
+              📕 PDF
+            </button>
+          </div>
+        </div>
+
         {/* Filtres de date */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label className="text-slate-200">Date de début (optionnel)</Label>
             <Input
@@ -134,7 +176,7 @@ export default function ExportData() {
           ) : (
             <>
               <Download className="w-4 h-4 mr-2" />
-              Exporter en CSV
+              Exporter en {format.toUpperCase()}
             </>
           )}
         </Button>
