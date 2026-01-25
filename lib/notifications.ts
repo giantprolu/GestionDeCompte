@@ -181,7 +181,12 @@ async function markNotificationSent(
 export async function sendPushNotification(
   userId: string,
   notification: CriticalNotification
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{
+  success: boolean
+  error?: string
+  successCount?: number
+  invalidSubscriptionsRemoved?: number
+}> {
   try {
     console.log('[Notifications] Attempting to send push notification:', {
       userId,
