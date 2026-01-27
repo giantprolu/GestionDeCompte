@@ -86,28 +86,51 @@ function calculatePosition(
     // On mobile, always use full-width bottom/top positioning
     if (isMobile) {
         const targetCenterX = targetRect.left + targetRect.width / 2
+        const targetCenterY = targetRect.top + targetRect.height / 2
         const spaceBelow = viewport.height - targetRect.bottom
         const spaceAbove = targetRect.top
 
         // PWA safe area buffer (accounts for iOS home indicator, notch, etc.)
-        const safeAreaBuffer = 40
+        const safeAreaTop = 60 // Status bar + notch
+        const safeAreaBottom = 100 // Home indicator + nav bar
 
-        // Decide if tooltip goes above or below target
-        // Prefer below if there's enough space (at least 180px for content + safe area)
-        const goBelow = spaceBelow > 180 || spaceBelow > spaceAbove
+        // Minimum space needed for tooltip (approximate height with content)
+        const minTooltipSpace = 200
 
         // Arrow position (percentage from left)
         const arrowLeftPercent = Math.max(10, Math.min(90, (targetCenterX / viewport.width) * 100))
 
-        if (goBelow) {
-            // Calculate max height to avoid overflow at bottom (with PWA safe area)
-            const maxAvailableHeight = viewport.height - targetRect.bottom - margin - safeAreaBuffer
+        // Check if target element is very large (takes most of screen)
+        const targetIsLarge = targetRect.height > viewport.height * 0.5
+
+        // If target is very large or neither above nor below has enough space, use centered overlay
+        if (targetIsLarge || (spaceAbove < minTooltipSpace && spaceBelow < minTooltipSpace)) {
             return {
                 position: {
-                    top: targetRect.bottom + margin,
+                    top: safeAreaTop,
                     left: margin,
                     right: margin,
-                    maxHeight: Math.max(150, Math.min(maxAvailableHeight, viewport.height * 0.5))
+                    maxHeight: viewport.height - safeAreaTop - safeAreaBottom
+                },
+                arrow: { borderColor: 'transparent' },
+                actualPlacement: 'center'
+            }
+        }
+
+        // Decide if tooltip goes above or below target
+        // Prefer below if there's enough space
+        const goBelow = spaceBelow >= minTooltipSpace && (spaceBelow >= spaceAbove || spaceAbove < minTooltipSpace)
+
+        if (goBelow) {
+            // Position below the target element
+            const topPosition = Math.min(targetRect.bottom + margin, viewport.height - minTooltipSpace - safeAreaBottom)
+            const maxAvailableHeight = viewport.height - topPosition - safeAreaBottom
+            return {
+                position: {
+                    top: topPosition,
+                    left: margin,
+                    right: margin,
+                    maxHeight: Math.max(150, Math.min(maxAvailableHeight, viewport.height * 0.45))
                 },
                 arrow: {
                     top: -ARROW_SIZE,
@@ -118,14 +141,15 @@ function calculatePosition(
                 actualPlacement: 'bottom'
             }
         } else {
-            // Calculate max height to avoid overflow at top (with status bar safe area)
-            const maxAvailableHeight = targetRect.top - margin - safeAreaBuffer
+            // Position above the target element - use top positioning to ensure visibility
+            const maxAvailableHeight = Math.min(targetRect.top - margin - safeAreaTop, viewport.height * 0.45)
+            const topPosition = Math.max(safeAreaTop, targetRect.top - margin - maxAvailableHeight)
             return {
                 position: {
-                    bottom: viewport.height - targetRect.top + margin,
+                    top: topPosition,
                     left: margin,
                     right: margin,
-                    maxHeight: Math.max(150, Math.min(maxAvailableHeight, viewport.height * 0.5))
+                    maxHeight: Math.max(150, maxAvailableHeight)
                 },
                 arrow: {
                     bottom: -ARROW_SIZE,
