@@ -88,22 +88,26 @@ function calculatePosition(
         const targetCenterX = targetRect.left + targetRect.width / 2
         const spaceBelow = viewport.height - targetRect.bottom
         const spaceAbove = targetRect.top
-        
+
+        // PWA safe area buffer (accounts for iOS home indicator, notch, etc.)
+        const safeAreaBuffer = 40
+
         // Decide if tooltip goes above or below target
-        const goBelow = spaceBelow > 150 || spaceBelow > spaceAbove
-        
+        // Prefer below if there's enough space (at least 180px for content + safe area)
+        const goBelow = spaceBelow > 180 || spaceBelow > spaceAbove
+
         // Arrow position (percentage from left)
         const arrowLeftPercent = Math.max(10, Math.min(90, (targetCenterX / viewport.width) * 100))
-        
+
         if (goBelow) {
-            // Calculate max height to avoid overflow at bottom
-            const maxAvailableHeight = viewport.height - targetRect.bottom - margin - 20 // 20px buffer for safe area
+            // Calculate max height to avoid overflow at bottom (with PWA safe area)
+            const maxAvailableHeight = viewport.height - targetRect.bottom - margin - safeAreaBuffer
             return {
                 position: {
                     top: targetRect.bottom + margin,
                     left: margin,
                     right: margin,
-                    maxHeight: Math.min(maxAvailableHeight, viewport.height * 0.6)
+                    maxHeight: Math.max(150, Math.min(maxAvailableHeight, viewport.height * 0.5))
                 },
                 arrow: {
                     top: -ARROW_SIZE,
@@ -114,14 +118,14 @@ function calculatePosition(
                 actualPlacement: 'bottom'
             }
         } else {
-            // Calculate max height to avoid overflow at top
-            const maxAvailableHeight = targetRect.top - margin - 20 // 20px buffer for safe area
+            // Calculate max height to avoid overflow at top (with status bar safe area)
+            const maxAvailableHeight = targetRect.top - margin - safeAreaBuffer
             return {
                 position: {
                     bottom: viewport.height - targetRect.top + margin,
                     left: margin,
                     right: margin,
-                    maxHeight: Math.min(maxAvailableHeight, viewport.height * 0.6)
+                    maxHeight: Math.max(150, Math.min(maxAvailableHeight, viewport.height * 0.5))
                 },
                 arrow: {
                     bottom: -ARROW_SIZE,

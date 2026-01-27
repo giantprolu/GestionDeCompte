@@ -121,7 +121,7 @@ export const onboardingTutorial: TutorialConfig = {
             targetSelector: 'expense-chart',
             route: '/',
             placement: 'top',
-            mobilePlacement: 'top',
+            mobilePlacement: 'bottom',
             highlightStyle: 'pulse',
             canSkip: true
         },
@@ -167,7 +167,7 @@ export const onboardingTutorial: TutorialConfig = {
             targetSelector: 'credit-tracking-card',
             route: '/previsionnel',
             placement: 'left',
-            mobilePlacement: 'top',
+            mobilePlacement: 'bottom',
             canSkip: true
         },
         {
