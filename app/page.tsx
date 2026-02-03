@@ -229,7 +229,7 @@ export default function Home() {
         const message = data.debug?.message || 'Changement de mois appliqué !'
         alert(message)
       } else {
-        alert('Erreur : ' + (data.error || 'Impossible d'archiver les transactions'))
+        alert('Erreur : ' + (data.error || 'Impossible d\'archiver les transactions'))
       }
     } catch (error) {
       alert('Erreur serveur : ' + error)
