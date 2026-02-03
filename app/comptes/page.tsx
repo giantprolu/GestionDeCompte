@@ -53,6 +53,21 @@ export default function ComptesPage() {
   // État pour le formulaire de virement
   const [showTransferForm, setShowTransferForm] = useState(false)
 
+  // État pour le drag and drop
+  const [isDragging, setIsDragging] = useState(false)
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [isMobile, setIsMobile] = useState(false)
+
+  // Détecter si on est sur mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile('ontouchstart' in window || navigator.maxTouchPoints > 0)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
   useEffect(() => {
     if (isLoaded && isSignedIn) {
       fetchAccounts()
@@ -548,6 +563,20 @@ export default function ComptesPage() {
         )}
       </AnimatePresence>
 
+      {/* Message d'aide pour le drag and drop */}
+      {accounts.length > 1 && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center gap-2 px-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg"
+        >
+          <GripVertical className="w-4 h-4 text-slate-400" />
+          <p className="text-xs text-slate-400">
+            <span className="font-semibold text-slate-300">{isMobile ? 'Maintenez et faites glisser' : 'Glissez-déposez'}</span> les cartes pour réorganiser vos comptes
+          </p>
+        </motion.div>
+      )}
+
       {/* Liste des comptes */}
       {accounts.length === 0 ? (
         <motion.div
@@ -579,14 +608,52 @@ export default function ComptesPage() {
           values={accounts}
           onReorder={handleReorder}
           className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent"
+          style={{
+            WebkitOverflowScrolling: 'touch',
+            scrollBehavior: isDragging ? 'auto' : 'smooth',
+            touchAction: 'pan-x pan-y'
+          }}
         >
           {accounts.map((account) => (
             <Reorder.Item
               key={account.id}
               value={account}
               className="flex-shrink-0 w-80"
+              whileDrag={{
+                scale: isMobile ? 1.08 : 1.05,
+                zIndex: 999,
+                boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
+                cursor: 'grabbing',
+                opacity: 0.9
+              }}
+              dragConstraints={{ left: 0, right: 0 }}
+              dragElastic={isMobile ? 0.05 : 0.1}
+              dragTransition={{
+                bounceStiffness: isMobile ? 800 : 600,
+                bounceDamping: isMobile ? 30 : 20,
+                power: 0.3,
+                timeConstant: isMobile ? 200 : 400
+              }}
+              onDragStart={() => {
+                setIsDragging(true)
+                setDraggingId(account.id)
+                // Vibration haptique sur mobile
+                if (isMobile && 'vibrate' in navigator) {
+                  navigator.vibrate(50)
+                }
+              }}
+              onDragEnd={() => {
+                setIsDragging(false)
+                setDraggingId(null)
+                // Petite vibration de confirmation
+                if (isMobile && 'vibrate' in navigator) {
+                  navigator.vibrate(30)
+                }
+              }}
             >
               <Card className={`h-full border bg-gradient-to-br from-slate-800/95 to-slate-900/95 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden ${
+                  draggingId === account.id ? 'ring-4 ring-white/30 border-white/50' : ''
+                } ${
                   account.type === 'ponctuel'
                     ? 'border-blue-500/30 hover:border-blue-500/50'
                     : account.type === 'obligatoire'
@@ -664,10 +731,28 @@ export default function ComptesPage() {
                       {/* Header avec nom et badges */}
                       <div className="flex items-start justify-between gap-2 mb-3">
                         <div className="flex items-center gap-2">
-                          {/* Poignée de drag */}
-                          <div className="cursor-grab active:cursor-grabbing text-slate-500 hover:text-slate-400 transition-colors">
-                            <GripVertical className="w-5 h-5" />
-                          </div>
+                          {/* Poignée de drag - optimisée pour mobile */}
+                          <motion.div
+                            className={`${isMobile ? 'p-3 -m-2' : 'p-2'} cursor-grab active:cursor-grabbing text-slate-500 hover:text-slate-400 transition-all rounded-lg hover:bg-slate-700/50 select-none`}
+                            whileTap={{ scale: 0.95 }}
+                            whileHover={{ scale: 1.1, color: '#94a3b8' }}
+                            animate={isMobile ? {
+                              x: [0, 2, 0, -2, 0],
+                              transition: {
+                                duration: 2,
+                                repeat: Infinity,
+                                repeatDelay: 5,
+                                ease: "easeInOut"
+                              }
+                            } : {}}
+                            onPointerDown={(e) => {
+                              if (isMobile) {
+                                e.currentTarget.setPointerCapture(e.pointerId)
+                              }
+                            }}
+                          >
+                            <GripVertical className={`${isMobile ? 'w-6 h-6' : 'w-5 h-5'}`} />
+                          </motion.div>
                           <div className="flex items-center gap-3">
                           <div className={`p-2.5 rounded-xl ${
                             account.type === 'ponctuel'
