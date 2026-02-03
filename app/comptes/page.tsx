@@ -8,8 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Wallet, Save, Pencil, X, Share2, Plus, Trash2, CreditCard, PiggyBank, ChevronRight, Calculator, ArrowRightLeft } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { Wallet, Save, Pencil, X, Share2, Plus, Trash2, CreditCard, PiggyBank, ChevronRight, Calculator, ArrowRightLeft, GripVertical } from 'lucide-react'
+import { motion, AnimatePresence, Reorder } from 'framer-motion'
 import { useUserSettings } from '@/components/AppWrapper'
 import TransferForm from '@/components/TransferForm'
 
@@ -66,11 +66,43 @@ export default function ComptesPage() {
       const response = await fetch('/api/accounts')
       if (!response.ok) return
       const data = await response.json()
-      setAccounts(Array.isArray(data) ? data : [])
+
+      // Charger l'ordre personnalisé depuis localStorage
+      const savedOrder = localStorage.getItem('accountsOrder')
+      let orderedData = Array.isArray(data) ? data : []
+
+      if (savedOrder) {
+        try {
+          const orderIds = JSON.parse(savedOrder) as string[]
+          // Réorganiser les comptes selon l'ordre sauvegardé
+          const orderedAccounts: Account[] = []
+          const accountsMap = new Map(orderedData.map(acc => [acc.id, acc]))
+
+          // D'abord, ajouter les comptes dans l'ordre sauvegardé
+          orderIds.forEach(id => {
+            const account = accountsMap.get(id)
+            if (account) {
+              orderedAccounts.push(account)
+              accountsMap.delete(id)
+            }
+          })
+
+          // Ensuite, ajouter les nouveaux comptes qui n'étaient pas dans l'ordre sauvegardé
+          accountsMap.forEach(account => {
+            orderedAccounts.push(account)
+          })
+
+          orderedData = orderedAccounts
+        } catch (e) {
+          console.error('Erreur lors du chargement de l\'ordre des comptes:', e)
+        }
+      }
+
+      setAccounts(orderedData)
 
       // Initialiser les balances
       const initialBalances: Record<string, number> = {}
-      data.forEach((acc: Account) => {
+      orderedData.forEach((acc: Account) => {
         initialBalances[acc.id] = acc.initialBalance
       })
       setBalances(initialBalances)
@@ -79,6 +111,14 @@ export default function ComptesPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Fonction pour gérer le changement d'ordre des comptes
+  const handleReorder = (newOrder: Account[]) => {
+    setAccounts(newOrder)
+    // Sauvegarder l'ordre dans localStorage
+    const orderIds = newOrder.map(acc => acc.id)
+    localStorage.setItem('accountsOrder', JSON.stringify(orderIds))
   }
 
   // Calculer le solde courant pour chaque compte (utilise l'utilitaire centralisé)
@@ -534,13 +574,16 @@ export default function ComptesPage() {
           </Card>
         </motion.div>
       ) : (
-        <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent">
-          {accounts.map((account, index) => (
-            <motion.div
+        <Reorder.Group
+          axis="x"
+          values={accounts}
+          onReorder={handleReorder}
+          className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent"
+        >
+          {accounts.map((account) => (
+            <Reorder.Item
               key={account.id}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.05 }}
+              value={account}
               className="flex-shrink-0 w-80"
             >
               <Card className={`h-full border bg-gradient-to-br from-slate-800/95 to-slate-900/95 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden ${
@@ -620,7 +663,12 @@ export default function ComptesPage() {
                     <div className="flex flex-col h-full">
                       {/* Header avec nom et badges */}
                       <div className="flex items-start justify-between gap-2 mb-3">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          {/* Poignée de drag */}
+                          <div className="cursor-grab active:cursor-grabbing text-slate-500 hover:text-slate-400 transition-colors">
+                            <GripVertical className="w-5 h-5" />
+                          </div>
+                          <div className="flex items-center gap-3">
                           <div className={`p-2.5 rounded-xl ${
                             account.type === 'ponctuel'
                               ? 'bg-blue-500/20'
@@ -647,6 +695,7 @@ export default function ComptesPage() {
                               }`}>
                               {account.type === 'ponctuel' ? 'Occasionnel' : account.type === 'obligatoire' ? 'Obligatoire' : 'Livret'}
                             </span>
+                          </div>
                           </div>
                         </div>
                         {/* Badges */}
@@ -719,9 +768,9 @@ export default function ComptesPage() {
                   )}
                 </CardContent>
               </Card>
-            </motion.div>
+            </Reorder.Item>
           ))}
-        </div>
+        </Reorder.Group>
       )}
 
       {/* Card d'info */}
