@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { checkAndSendCriticalNotifications, forceTestNotifications } from '@/lib/notification-checker'
 
+// Configure route timeout (max 60 seconds for Vercel serverless)
+export const maxDuration = 60
+
 // GET: Vérifier et envoyer les notifications critiques pour l'utilisateur connecté
 export async function GET(request: NextRequest) {
   try {

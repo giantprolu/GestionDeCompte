@@ -4,14 +4,39 @@ import webpush, { PushSubscription as WebPushSubscription } from 'web-push'
 import { supabase } from '@/lib/db'
 
 // Configure VAPID details
-const vapidConfigured = !!(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY)
+const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY
+const vapidConfigured = !!(vapidPublicKey && vapidPrivateKey)
+
+// Log VAPID configuration status (without exposing keys)
+console.log('[Notifications] VAPID Configuration:', {
+  publicKeyPresent: !!vapidPublicKey,
+  publicKeyLength: vapidPublicKey?.length || 0,
+  privateKeyPresent: !!vapidPrivateKey,
+  privateKeyLength: vapidPrivateKey?.length || 0,
+  configured: vapidConfigured,
+  nodeEnv: process.env.NODE_ENV
+})
 
 if (vapidConfigured) {
-  webpush.setVapidDetails(
-    'mailto:contact@moneyflow.app',
-    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-    process.env.VAPID_PRIVATE_KEY!
-  )
+  try {
+    webpush.setVapidDetails(
+      'mailto:contact@moneyflow.app',
+      vapidPublicKey,
+      vapidPrivateKey
+    )
+    console.log('[Notifications] ✅ VAPID details configured successfully')
+  } catch (error) {
+    console.error('[Notifications] 🔴 Error configuring VAPID details:', error)
+  }
+} else {
+  console.error('[Notifications] 🔴 VAPID keys are missing!')
+  if (!vapidPublicKey) {
+    console.error('[Notifications] 🔴 Missing: NEXT_PUBLIC_VAPID_PUBLIC_KEY')
+  }
+  if (!vapidPrivateKey) {
+    console.error('[Notifications] 🔴 Missing: VAPID_PRIVATE_KEY')
+  }
 }
 
 // Types de notifications critiques
@@ -156,15 +181,29 @@ async function markNotificationSent(
 export async function sendPushNotification(
   userId: string,
   notification: CriticalNotification
-): Promise<{ success: boolean; error?: string }> {
-  try {    
+): Promise<{
+  success: boolean
+  error?: string
+  successCount?: number
+  invalidSubscriptionsRemoved?: number
+}> {
+  try {
+    console.log('[Notifications] Attempting to send push notification:', {
+      userId,
+      type: notification.type,
+      title: notification.title
+    })
+
     if (!vapidConfigured) {
+      console.error('[Notifications] 🔴 Cannot send notification: VAPID not configured')
       return { success: false, error: 'VAPID not configured' }
     }
 
     const subscriptions = await getUserSubscriptions(userId)
-    
+    console.log('[Notifications] Found subscriptions:', subscriptions.length)
+
     if (subscriptions.length === 0) {
+      console.warn('[Notifications] ⚠️ No subscriptions found for user:', userId)
       return { success: false, error: 'No subscriptions found' }
     }
 
@@ -178,20 +217,110 @@ export async function sendPushNotification(
       data: notification.data || {},
     })
 
+    console.log('[Notifications] Sending notification to', subscriptions.length, 'subscription(s)')
+
     const results = await Promise.allSettled(
-      subscriptions.map(sub => webpush.sendNotification(sub, payload))
+      subscriptions.map((sub, index) =>
+        webpush.sendNotification(sub, payload).catch(error => {
+          // Include subscription index in error for cleanup
+          error.subscriptionIndex = index
+          error.subscriptionEndpoint = sub.endpoint
+          throw error
+        })
+      )
     )
 
     const successCount = results.filter(r => r.status === 'fulfilled').length
     const failedResults = results.filter(r => r.status === 'rejected')
-    
+
+    console.log('[Notifications] Send results:', {
+      total: results.length,
+      successful: successCount,
+      failed: failedResults.length
+    })
+
+    // Track invalid subscriptions to remove
+    const invalidSubscriptions: string[] = []
+
+    // Log failed notifications with details and identify invalid subscriptions
+    if (failedResults.length > 0) {
+      failedResults.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          const error = result.reason as any
+          const statusCode = error?.statusCode
+          const endpoint = error?.subscriptionEndpoint
+
+          console.error(`[Notifications] 🔴 Failed to send to subscription ${index}:`, {
+            reason: error?.message || result.reason,
+            statusCode: statusCode,
+            body: error?.body,
+            endpoint: endpoint?.substring(0, 50) + '...'
+          })
+
+          // Status codes 403, 404, 410 indicate invalid/expired subscriptions
+          // 403: BadJwtToken (VAPID keys changed)
+          // 404: Subscription not found
+          // 410: Subscription expired
+          if (statusCode === 403 || statusCode === 404 || statusCode === 410) {
+            if (endpoint) {
+              console.warn('[Notifications] ⚠️ Marking subscription as invalid:', endpoint.substring(0, 50) + '...')
+              invalidSubscriptions.push(endpoint)
+            }
+          }
+        }
+      })
+
+      // Clean up invalid subscriptions from database
+      if (invalidSubscriptions.length > 0) {
+        console.log('[Notifications] 🧹 Cleaning up', invalidSubscriptions.length, 'invalid subscription(s)')
+        try {
+          const { error: deleteError } = await supabase
+            .from('push_subscriptions')
+            .delete()
+            .eq('user_id', userId)
+            .in('endpoint', invalidSubscriptions)
+
+          if (deleteError) {
+            console.error('[Notifications] 🔴 Error deleting invalid subscriptions:', deleteError)
+          } else {
+            console.log('[Notifications] ✅ Cleaned up invalid subscriptions')
+          }
+        } catch (cleanupError) {
+          console.error('[Notifications] 🔴 Error during cleanup:', cleanupError)
+        }
+      }
+    }
+
     if (successCount === 0) {
+      console.error('[Notifications] 🔴 All notifications failed')
+
+      // If all failed due to invalid subscriptions, provide helpful message
+      if (invalidSubscriptions.length === results.length) {
+        return {
+          success: false,
+          error: 'All subscriptions invalid - please re-enable notifications',
+          invalidSubscriptionsRemoved: invalidSubscriptions.length
+        }
+      }
+
       return { success: false, error: 'All notifications failed' }
     }
 
-    return { success: true }
+    console.log('[Notifications] ✅ Notification sent successfully to', successCount, 'subscription(s)')
+
+    return {
+      success: true,
+      successCount,
+      invalidSubscriptionsRemoved: invalidSubscriptions.length
+    }
   } catch (error) {
-    console.error('Error sending push notification:', error)
+    console.error('[Notifications] 🔴 Error sending push notification:', error)
+    if (error instanceof Error) {
+      console.error('[Notifications] 🔴 Error details:', {
+        message: error.message,
+        stack: error.stack
+      })
+    }
     return { success: false, error: 'Failed to send notification' }
   }
 }

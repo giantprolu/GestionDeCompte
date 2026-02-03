@@ -117,7 +117,7 @@ export function CategorySelect({
       <SelectTrigger className={className}>
         <SelectValue placeholder="Sélectionner une catégorie" />
       </SelectTrigger>
-      <SelectContent className="bg-slate-800 border-slate-700">
+      <SelectContent className="bg-slate-800 border-slate-700 overflow-x-hidden">
         {/* Search Input - sticky */}
         <div className="p-2 sticky top-0 bg-slate-800 z-10 border-b border-slate-700">
           <Input
@@ -135,7 +135,7 @@ export function CategorySelect({
           />
         </div>
 
-        <div className="max-h-[300px] overflow-y-auto">
+        <div className="max-h-[300px] overflow-y-auto overflow-x-hidden">
           {/* Frequent Section */}
           {filteredFrequent.length > 0 && (
             <>
@@ -149,9 +149,9 @@ export function CategorySelect({
                     value={category.id}
                     className="text-white hover:bg-slate-700 cursor-pointer"
                   >
-                    <span className="flex items-center gap-2">
-                      <span>{category.icon}</span>
-                      <span>{category.name}</span>
+                    <span className="flex items-center gap-2 min-w-0">
+                      <span className="flex-shrink-0">{category.icon}</span>
+                      <span className="truncate">{category.name}</span>
                     </span>
                   </SelectItem>
                 ))}
@@ -172,9 +172,9 @@ export function CategorySelect({
                   value={category.id}
                   className="text-white hover:bg-slate-700 cursor-pointer"
                 >
-                  <span className="flex items-center gap-2">
-                    <span>{category.icon}</span>
-                    <span>{category.name}</span>
+                  <span className="flex items-center gap-2 min-w-0">
+                    <span className="flex-shrink-0">{category.icon}</span>
+                    <span className="truncate">{category.name}</span>
                   </span>
                 </SelectItem>
               ))
