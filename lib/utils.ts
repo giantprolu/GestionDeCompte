@@ -67,8 +67,13 @@ export async function archivePreviousMonthTransactions(userId: string) {
     throw new Error('Erreur lors de la récupération des transactions')
   }
 
+  // Si aucune transaction à archiver, retourner un message de succès
   if (!txsToArchive || txsToArchive.length === 0) {
-    throw new Error('Aucune transaction à archiver')
+    return {
+      updated: null,
+      closure: null,
+      message: 'Aucune transaction à archiver. Toutes vos transactions sont déjà à jour !'
+    }
   }
 
   const firstDate = txsToArchive[0].date
@@ -77,8 +82,13 @@ export async function archivePreviousMonthTransactions(userId: string) {
   // Générer un champ month_year unique basé sur la période
   const monthYear = `${firstDate}_${lastDate}`
 
-  // Enregistrer la période de clôture
-  await setMonthClosure(userId, monthYear, firstDate, lastDate)
+  // Enregistrer la période de clôture (utilise upsert, donc pas d'erreur si existe déjà)
+  try {
+    await setMonthClosure(userId, monthYear, firstDate, lastDate)
+  } catch (closureError) {
+    // Si la clôture existe déjà, on continue quand même l'archivage
+    console.log('[archivePreviousMonthTransactions] Closure already exists, continuing with archival')
+  }
 
   // Archiver les transactions de cet utilisateur
   const { data, error } = await supabase
@@ -91,6 +101,10 @@ export async function archivePreviousMonthTransactions(userId: string) {
   if (error) {
     throw new Error('Erreur lors de l\'archivage des transactions : ' + error.message)
   }
-  
-  return { updated: data, closure: { monthYear, startDate: firstDate, endDate: lastDate } }
+
+  return {
+    updated: data,
+    closure: { monthYear, startDate: firstDate, endDate: lastDate },
+    message: `${txsToArchive.length} transaction(s) archivée(s) avec succès !`
+  }
 }

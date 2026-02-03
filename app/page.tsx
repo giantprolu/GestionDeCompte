@@ -225,9 +225,11 @@ export default function Home() {
       if (data.success) {
         // Recharger les données pour mettre à jour l'affichage
         await fetchData()
-        alert('Changement de mois appliqué !')
+        // Afficher le message retourné par l'API ou un message par défaut
+        const message = data.debug?.message || 'Changement de mois appliqué !'
+        alert(message)
       } else {
-        alert('Erreur : ' + (data.error || 'Impossible d’archiver les transactions'))
+        alert('Erreur : ' + (data.error || 'Impossible d'archiver les transactions'))
       }
     } catch (error) {
       alert('Erreur serveur : ' + error)
