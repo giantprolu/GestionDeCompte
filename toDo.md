@@ -1,3 +1,0 @@
-- [x] Fix bug impossible de supprimer une catégorie ajouté par l'utilisateur
-- [x] fix bug du changement de mois, sur le principe ça fonctionne mais il renvoie une erreur a l'utilisateur avant de fonctionner
-- [x] pouvoir drag and slide les card de compte sur la page compte pour que l'utilisateur puisse choisir le compte qu'il veut voir en premier

@@ -9,9 +9,27 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Wallet, Save, Pencil, X, Share2, Plus, Trash2, CreditCard, PiggyBank, ChevronRight, Calculator, ArrowRightLeft, GripVertical } from 'lucide-react'
-import { motion, AnimatePresence, Reorder } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useUserSettings } from '@/components/AppWrapper'
 import TransferForm from '@/components/TransferForm'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  horizontalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 interface Account {
   id: string
@@ -24,6 +42,251 @@ interface Account {
   permission?: 'view' | 'edit'
   shareId?: string
   ownerUserId?: string
+}
+
+// Composant pour une carte de compte triable
+function SortableAccountCard({
+  account,
+  isMobile,
+  isDragging,
+  editingId,
+  editingValue,
+  balances,
+  getCurrentBalance,
+  startEditing,
+  handleUpdateBalance,
+  handleTogglePrevisionnel,
+  handleDeleteAccount,
+  setEditingId,
+  setEditingValue,
+}: {
+  account: Account
+  isMobile: boolean
+  isDragging: boolean
+  editingId: string | null
+  editingValue: string
+  balances: Record<string, number>
+  getCurrentBalance: (id: string) => number
+  startEditing: (id: string, balance: number) => void
+  handleUpdateBalance: (id: string) => Promise<void>
+  handleTogglePrevisionnel: (id: string, value: boolean) => Promise<void>
+  handleDeleteAccount: (id: string, name: string) => Promise<void>
+  setEditingId: (id: string | null) => void
+  setEditingValue: (value: string) => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging: isCardDragging,
+  } = useSortable({ id: account.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isCardDragging ? 999 : 'auto',
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex-shrink-0 w-80"
+    >
+      <Card className={`h-full border bg-gradient-to-br from-slate-800/95 to-slate-900/95 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden ${
+        isCardDragging ? 'ring-4 ring-white/30 border-white/50 opacity-50' : ''
+      } ${
+        account.type === 'ponctuel'
+          ? 'border-blue-500/30 hover:border-blue-500/50'
+          : account.type === 'obligatoire'
+          ? 'border-emerald-500/30 hover:border-emerald-500/50'
+          : 'border-purple-500/30 hover:border-purple-500/50'
+      }`}>
+        <CardContent className="p-4">
+          {editingId === account.id ? (
+            // Mode édition
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="space-y-4"
+            >
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-xl ${
+                  account.type === 'ponctuel'
+                    ? 'bg-blue-500/20'
+                    : account.type === 'obligatoire'
+                    ? 'bg-emerald-500/20'
+                    : 'bg-purple-500/20'
+                }`}>
+                  <Pencil className={`w-5 h-5 ${
+                    account.type === 'ponctuel'
+                      ? 'text-blue-400'
+                      : account.type === 'obligatoire'
+                      ? 'text-emerald-400'
+                      : 'text-purple-400'
+                  }`} />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-white">{account.name}</h3>
+                  <p className="text-sm text-slate-400">Modifier le solde initial</p>
+                </div>
+              </div>
+
+              <div className="relative">
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={editingValue}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9.,]/g, '')
+                    setEditingValue(value)
+                  }}
+                  className="bg-slate-700/50 border-slate-600/50 text-white text-2xl font-bold h-14 pr-12 focus:border-blue-500 focus:ring-blue-500/20"
+                  autoFocus
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl font-semibold">€</span>
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => handleUpdateBalance(account.id)}
+                  className="flex-1 h-11 gap-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold shadow-lg"
+                >
+                  <Save className="w-4 h-4" />
+                  Enregistrer
+                </Button>
+                <Button
+                  onClick={() => {
+                    setEditingId(null)
+                    setEditingValue('')
+                  }}
+                  variant="outline"
+                  className="h-11 px-6 bg-slate-700/50 border-slate-600/50 text-white hover:bg-slate-700"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            </motion.div>
+          ) : (
+            // Mode affichage - Layout vertical pour cards en ligne
+            <div className="flex flex-col h-full">
+              {/* Header avec nom et badges */}
+              <div className="flex items-start justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2">
+                  {/* Poignée de drag - optimisée pour mobile */}
+                  <motion.div
+                    {...listeners}
+                    {...attributes}
+                    className={`${isMobile ? 'p-3 -m-2' : 'p-2'} cursor-grab active:cursor-grabbing text-slate-500 hover:text-slate-400 transition-all rounded-lg hover:bg-slate-700/50 select-none touch-none`}
+                    whileTap={{ scale: 0.95 }}
+                    whileHover={{ scale: 1.1 }}
+                  >
+                    <GripVertical className={`${isMobile ? 'w-6 h-6' : 'w-5 h-5'}`} />
+                  </motion.div>
+                  <div className="flex items-center gap-3">
+                  <div className={`p-2.5 rounded-xl ${
+                    account.type === 'ponctuel'
+                      ? 'bg-blue-500/20'
+                      : account.type === 'obligatoire'
+                      ? 'bg-emerald-500/20'
+                      : 'bg-purple-500/20'
+                    }`}>
+                    {account.type === 'ponctuel' ? (
+                      <CreditCard className="w-5 h-5 text-blue-400" />
+                    ) : account.type === 'obligatoire' ? (
+                      <Wallet className="w-5 h-5 text-emerald-400" />
+                    ) : (
+                      <PiggyBank className="w-5 h-5 text-purple-400" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base text-white">{account.name}</h3>
+                    <span className={`text-xs font-medium ${
+                      account.type === 'ponctuel'
+                        ? 'text-blue-400'
+                        : account.type === 'obligatoire'
+                        ? 'text-emerald-400'
+                        : 'text-purple-400'
+                      }`}>
+                      {account.type === 'ponctuel' ? 'Occasionnel' : account.type === 'obligatoire' ? 'Obligatoire' : 'Livret'}
+                    </span>
+                  </div>
+                  </div>
+                </div>
+                {/* Badges */}
+                <div className="flex flex-col gap-1">
+                  {!account.isOwner && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 text-[10px] font-medium">
+                      <Share2 className="w-2.5 h-2.5" />
+                      Partagé
+                    </span>
+                  )}
+                  {account.excludeFromPrevisionnel && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-300 text-[10px] font-medium">
+                      <Calculator className="w-2.5 h-2.5" />
+                      Exclu
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Solde actuel - Prominent */}
+              <div className="flex-1 flex flex-col justify-center py-3 border-y border-slate-700/50">
+                <p className="text-xs text-slate-400 mb-1">Solde actuel</p>
+                <p className={`text-3xl font-bold ${getCurrentBalance(account.id) >= 0 ? 'text-green-400' : 'text-red-400'
+                  }`}>
+                  {getCurrentBalance(account.id).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Initial: {(balances[account.id] ?? account.initialBalance).toFixed(2)} €
+                </p>
+              </div>
+
+              {/* Actions */}
+              {(account.isOwner || account.permission === 'edit') && (
+                <div className="flex items-center justify-end gap-1 pt-3">
+                  <Button
+                    onClick={() => handleTogglePrevisionnel(account.id, account.excludeFromPrevisionnel || false)}
+                    variant="ghost"
+                    size="icon"
+                    title={account.excludeFromPrevisionnel ? 'Inclure dans le prévisionnel' : 'Exclure du prévisionnel'}
+                    className={`h-8 w-8 rounded-lg transition-all ${account.excludeFromPrevisionnel
+                        ? 'bg-orange-500/20 hover:bg-orange-500/30 text-orange-400'
+                        : 'hover:bg-slate-700 text-slate-400 hover:text-white'
+                      }`}
+                  >
+                    <Calculator className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    onClick={() => startEditing(account.id, balances[account.id] ?? account.initialBalance)}
+                    variant="ghost"
+                    size="icon"
+                    title="Modifier le solde"
+                    className="h-8 w-8 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-blue-400 transition-all"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                  {account.isOwner && (
+                    <Button
+                      onClick={() => handleDeleteAccount(account.id, account.name)}
+                      variant="ghost"
+                      size="icon"
+                      title="Supprimer"
+                      className="h-8 w-8 rounded-lg hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-all"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
 }
 
 export default function ComptesPage() {
@@ -54,8 +317,7 @@ export default function ComptesPage() {
   const [showTransferForm, setShowTransferForm] = useState(false)
 
   // État pour le drag and drop
-  const [isDragging, setIsDragging] = useState(false)
-  const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [activeId, setActiveId] = useState<string | null>(null)
   const [isMobile, setIsMobile] = useState(false)
 
   // Détecter si on est sur mobile
@@ -67,6 +329,23 @@ export default function ComptesPage() {
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
+
+  // Configurer les sensors pour le drag and drop
+  // Sur mobile : délai de 250ms pour éviter conflit avec scroll
+  // Sur desktop : délai de 0ms avec distance de 10px
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // 8px de mouvement avant d'activer le drag
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250, // 250ms de pression avant d'activer le drag sur mobile
+        tolerance: 5, // Tolérance de 5px pendant le délai
+      },
+    })
+  )
 
   useEffect(() => {
     if (isLoaded && isSignedIn) {
@@ -128,12 +407,40 @@ export default function ComptesPage() {
     }
   }
 
-  // Fonction pour gérer le changement d'ordre des comptes
-  const handleReorder = (newOrder: Account[]) => {
-    setAccounts(newOrder)
-    // Sauvegarder l'ordre dans localStorage
-    const orderIds = newOrder.map(acc => acc.id)
-    localStorage.setItem('accountsOrder', JSON.stringify(orderIds))
+  // Fonction pour gérer le début du drag
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string)
+    // Vibration haptique sur mobile
+    if (isMobile && 'vibrate' in navigator) {
+      navigator.vibrate(50)
+    }
+  }
+
+  // Fonction pour gérer la fin du drag
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (over && active.id !== over.id) {
+      setAccounts((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id)
+        const newIndex = items.findIndex((item) => item.id === over.id)
+
+        const newOrder = arrayMove(items, oldIndex, newIndex)
+
+        // Sauvegarder l'ordre dans localStorage
+        const orderIds = newOrder.map(acc => acc.id)
+        localStorage.setItem('accountsOrder', JSON.stringify(orderIds))
+
+        return newOrder
+      })
+
+      // Vibration de confirmation sur mobile
+      if (isMobile && 'vibrate' in navigator) {
+        navigator.vibrate(30)
+      }
+    }
+
+    setActiveId(null)
   }
 
   // Calculer le solde courant pour chaque compte (utilise l'utilitaire centralisé)
@@ -572,7 +879,9 @@ export default function ComptesPage() {
         >
           <GripVertical className="w-4 h-4 text-slate-400" />
           <p className="text-xs text-slate-400">
-            <span className="font-semibold text-slate-300">{isMobile ? 'Maintenez et faites glisser' : 'Glissez-déposez'}</span> les cartes pour réorganiser vos comptes
+            <span className="font-semibold text-slate-300">
+              {isMobile ? 'Maintenez appuyé 0.3s puis glissez' : 'Glissez-déposez'}
+            </span> la poignée <GripVertical className="w-3 h-3 inline-block text-slate-500" /> pour réorganiser vos comptes
           </p>
         </motion.div>
       )}
@@ -603,259 +912,58 @@ export default function ComptesPage() {
           </Card>
         </motion.div>
       ) : (
-        <Reorder.Group
-          axis="x"
-          values={accounts}
-          onReorder={handleReorder}
-          className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent"
-          style={{
-            WebkitOverflowScrolling: 'touch',
-            scrollBehavior: isDragging ? 'auto' : 'smooth',
-            touchAction: 'pan-x pan-y'
-          }}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
         >
-          {accounts.map((account) => (
-            <Reorder.Item
-              key={account.id}
-              value={account}
-              className="flex-shrink-0 w-80"
-              whileDrag={{
-                scale: isMobile ? 1.08 : 1.05,
-                zIndex: 999,
-                boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
-                cursor: 'grabbing',
-                opacity: 0.9
-              }}
-              dragConstraints={{ left: 0, right: 0 }}
-              dragElastic={isMobile ? 0.05 : 0.1}
-              dragTransition={{
-                bounceStiffness: isMobile ? 800 : 600,
-                bounceDamping: isMobile ? 30 : 20,
-                power: 0.3,
-                timeConstant: isMobile ? 200 : 400
-              }}
-              onDragStart={() => {
-                setIsDragging(true)
-                setDraggingId(account.id)
-                // Vibration haptique sur mobile
-                if (isMobile && 'vibrate' in navigator) {
-                  navigator.vibrate(50)
-                }
-              }}
-              onDragEnd={() => {
-                setIsDragging(false)
-                setDraggingId(null)
-                // Petite vibration de confirmation
-                if (isMobile && 'vibrate' in navigator) {
-                  navigator.vibrate(30)
-                }
+          <SortableContext
+            items={accounts.map(acc => acc.id)}
+            strategy={horizontalListSortingStrategy}
+          >
+            <div
+              className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent"
+              style={{
+                WebkitOverflowScrolling: 'touch',
+                scrollBehavior: activeId ? 'auto' : 'smooth',
               }}
             >
-              <Card className={`h-full border bg-gradient-to-br from-slate-800/95 to-slate-900/95 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden ${
-                  draggingId === account.id ? 'ring-4 ring-white/30 border-white/50' : ''
-                } ${
-                  account.type === 'ponctuel'
-                    ? 'border-blue-500/30 hover:border-blue-500/50'
-                    : account.type === 'obligatoire'
-                    ? 'border-emerald-500/30 hover:border-emerald-500/50'
-                    : 'border-purple-500/30 hover:border-purple-500/50'
-                }`}>
-                <CardContent className="p-4">
-                  {editingId === account.id ? (
-                    // Mode édition
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="space-y-4"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-xl ${
-                          account.type === 'ponctuel'
-                            ? 'bg-blue-500/20'
-                            : account.type === 'obligatoire'
-                            ? 'bg-emerald-500/20'
-                            : 'bg-purple-500/20'
-                        }`}>
-                          <Pencil className={`w-5 h-5 ${
-                            account.type === 'ponctuel'
-                              ? 'text-blue-400'
-                              : account.type === 'obligatoire'
-                              ? 'text-emerald-400'
-                              : 'text-purple-400'
-                          }`} />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-white">{account.name}</h3>
-                          <p className="text-sm text-slate-400">Modifier le solde initial</p>
-                        </div>
-                      </div>
+              {accounts.map((account) => (
+                <SortableAccountCard
+                  key={account.id}
+                  account={account}
+                  isMobile={isMobile}
+                  isDragging={!!activeId}
+                  editingId={editingId}
+                  editingValue={editingValue}
+                  balances={balances}
+                  getCurrentBalance={getCurrentBalance}
+                  startEditing={startEditing}
+                  handleUpdateBalance={handleUpdateBalance}
+                  handleTogglePrevisionnel={handleTogglePrevisionnel}
+                  handleDeleteAccount={handleDeleteAccount}
+                  setEditingId={setEditingId}
+                  setEditingValue={setEditingValue}
+                />
+              ))}
+            </div>
+          </SortableContext>
 
-                      <div className="relative">
-                        <Input
-                          type="text"
-                          inputMode="decimal"
-                          value={editingValue}
-                          onChange={(e) => {
-                            const value = e.target.value.replace(/[^0-9.,]/g, '')
-                            setEditingValue(value)
-                          }}
-                          className="bg-slate-700/50 border-slate-600/50 text-white text-2xl font-bold h-14 pr-12 focus:border-blue-500 focus:ring-blue-500/20"
-                          autoFocus
-                        />
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl font-semibold">€</span>
-                      </div>
-
-                      <div className="flex gap-3">
-                        <Button
-                          onClick={() => handleUpdateBalance(account.id)}
-                          className="flex-1 h-11 gap-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold shadow-lg"
-                        >
-                          <Save className="w-4 h-4" />
-                          Enregistrer
-                        </Button>
-                        <Button
-                          onClick={() => {
-                            setEditingId(null)
-                            setEditingValue('')
-                          }}
-                          variant="outline"
-                          className="h-11 px-6 bg-slate-700/50 border-slate-600/50 text-white hover:bg-slate-700"
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </motion.div>
-                  ) : (
-                    // Mode affichage - Layout vertical pour cards en ligne
-                    <div className="flex flex-col h-full">
-                      {/* Header avec nom et badges */}
-                      <div className="flex items-start justify-between gap-2 mb-3">
-                        <div className="flex items-center gap-2">
-                          {/* Poignée de drag - optimisée pour mobile */}
-                          <motion.div
-                            className={`${isMobile ? 'p-3 -m-2' : 'p-2'} cursor-grab active:cursor-grabbing text-slate-500 hover:text-slate-400 transition-all rounded-lg hover:bg-slate-700/50 select-none`}
-                            whileTap={{ scale: 0.95 }}
-                            whileHover={{ scale: 1.1, color: '#94a3b8' }}
-                            animate={isMobile ? {
-                              x: [0, 2, 0, -2, 0],
-                              transition: {
-                                duration: 2,
-                                repeat: Infinity,
-                                repeatDelay: 5,
-                                ease: "easeInOut"
-                              }
-                            } : {}}
-                            onPointerDown={(e) => {
-                              if (isMobile) {
-                                e.currentTarget.setPointerCapture(e.pointerId)
-                              }
-                            }}
-                          >
-                            <GripVertical className={`${isMobile ? 'w-6 h-6' : 'w-5 h-5'}`} />
-                          </motion.div>
-                          <div className="flex items-center gap-3">
-                          <div className={`p-2.5 rounded-xl ${
-                            account.type === 'ponctuel'
-                              ? 'bg-blue-500/20'
-                              : account.type === 'obligatoire'
-                              ? 'bg-emerald-500/20'
-                              : 'bg-purple-500/20'
-                            }`}>
-                            {account.type === 'ponctuel' ? (
-                              <CreditCard className="w-5 h-5 text-blue-400" />
-                            ) : account.type === 'obligatoire' ? (
-                              <Wallet className="w-5 h-5 text-emerald-400" />
-                            ) : (
-                              <PiggyBank className="w-5 h-5 text-purple-400" />
-                            )}
-                          </div>
-                          <div>
-                            <h3 className="font-bold text-base text-white">{account.name}</h3>
-                            <span className={`text-xs font-medium ${
-                              account.type === 'ponctuel'
-                                ? 'text-blue-400'
-                                : account.type === 'obligatoire'
-                                ? 'text-emerald-400'
-                                : 'text-purple-400'
-                              }`}>
-                              {account.type === 'ponctuel' ? 'Occasionnel' : account.type === 'obligatoire' ? 'Obligatoire' : 'Livret'}
-                            </span>
-                          </div>
-                          </div>
-                        </div>
-                        {/* Badges */}
-                        <div className="flex flex-col gap-1">
-                          {!account.isOwner && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 text-[10px] font-medium">
-                              <Share2 className="w-2.5 h-2.5" />
-                              Partagé
-                            </span>
-                          )}
-                          {account.excludeFromPrevisionnel && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-300 text-[10px] font-medium">
-                              <Calculator className="w-2.5 h-2.5" />
-                              Exclu
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Solde actuel - Prominent */}
-                      <div className="flex-1 flex flex-col justify-center py-3 border-y border-slate-700/50">
-                        <p className="text-xs text-slate-400 mb-1">Solde actuel</p>
-                        <p className={`text-3xl font-bold ${getCurrentBalance(account.id) >= 0 ? 'text-green-400' : 'text-red-400'
-                          }`}>
-                          {getCurrentBalance(account.id).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
-                        </p>
-                        <p className="text-xs text-slate-500 mt-1">
-                          Initial: {(balances[account.id] ?? account.initialBalance).toFixed(2)} €
-                        </p>
-                      </div>
-
-                      {/* Actions */}
-                      {(account.isOwner || account.permission === 'edit') && (
-                        <div className="flex items-center justify-end gap-1 pt-3">
-                          <Button
-                            onClick={() => handleTogglePrevisionnel(account.id, account.excludeFromPrevisionnel || false)}
-                            variant="ghost"
-                            size="icon"
-                            title={account.excludeFromPrevisionnel ? 'Inclure dans le prévisionnel' : 'Exclure du prévisionnel'}
-                            className={`h-8 w-8 rounded-lg transition-all ${account.excludeFromPrevisionnel
-                                ? 'bg-orange-500/20 hover:bg-orange-500/30 text-orange-400'
-                                : 'hover:bg-slate-700 text-slate-400 hover:text-white'
-                              }`}
-                          >
-                            <Calculator className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            onClick={() => startEditing(account.id, balances[account.id] ?? account.initialBalance)}
-                            variant="ghost"
-                            size="icon"
-                            title="Modifier le solde"
-                            className="h-8 w-8 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-blue-400 transition-all"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </Button>
-                          {account.isOwner && (
-                            <Button
-                              onClick={() => handleDeleteAccount(account.id, account.name)}
-                              variant="ghost"
-                              size="icon"
-                              title="Supprimer"
-                              className="h-8 w-8 rounded-lg hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-all"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
-                      )}
+          <DragOverlay>
+            {activeId ? (
+              <div className="flex-shrink-0 w-80 opacity-80 rotate-2 scale-105">
+                <Card className="border-2 border-white/50 bg-gradient-to-br from-slate-800 to-slate-900 shadow-2xl">
+                  <CardContent className="p-4">
+                    <div className="text-white font-bold text-center">
+                      {accounts.find(acc => acc.id === activeId)?.name}
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            </Reorder.Item>
-          ))}
-        </Reorder.Group>
+                  </CardContent>
+                </Card>
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       )}
 
       {/* Card d'info */}
